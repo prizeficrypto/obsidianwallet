@@ -65,6 +65,7 @@ function TokenBlock({
   isReadOnly,
   isLoading,
   label,
+  heldAddresses,
 }: {
   token: TokenState;
   onTokenChange: (t: TokenState) => void;
@@ -73,6 +74,7 @@ function TokenBlock({
   isReadOnly?: boolean;
   isLoading?: boolean;
   label?: string;
+  heldAddresses?: Set<string>;
 }) {
   const [open, setOpen] = useState(false);
   const isNative = token.address.toLowerCase() === NATIVE_ETH.toLowerCase();
@@ -198,49 +200,62 @@ function TokenBlock({
                   {isNative && <Check size={12} className="text-purple-400 shrink-0" />}
                 </button>
 
-                {/* All curated tokens */}
-                <div className="mx-4 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-                <p
-                  className="px-4 pt-2 pb-1"
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 600,
-                    letterSpacing: "0.08em",
-                    color: "rgba(255,255,255,0.2)",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Tokens
-                </p>
-                {WORLD_CHAIN_TOKENS.map((t) => {
-                  const isSelected =
-                    !isNative && t.address.toLowerCase() === token.address.toLowerCase();
+                {/* Tokens — held first, then all others */}
+                {(() => {
+                  const held = heldAddresses && heldAddresses.size > 0
+                    ? WORLD_CHAIN_TOKENS.filter(t => heldAddresses.has(t.address.toLowerCase()))
+                    : [];
+                  const others = held.length > 0
+                    ? WORLD_CHAIN_TOKENS.filter(t => !heldAddresses!.has(t.address.toLowerCase()))
+                    : WORLD_CHAIN_TOKENS;
+
+                  function TokenRow({ t }: { t: typeof WORLD_CHAIN_TOKENS[number] }) {
+                    const isSelected = !isNative && t.address.toLowerCase() === token.address.toLowerCase();
+                    return (
+                      <button
+                        key={t.address}
+                        onClick={() => {
+                          onTokenChange({ address: t.address, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI, name: t.name });
+                          setOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 active:bg-white/5 transition-colors"
+                      >
+                        <TokenIcon logoURI={t.logoURI} symbol={t.symbol} size={28} />
+                        <div className="flex-1 text-left min-w-0">
+                          <p className="text-[13px] font-semibold text-white">{t.symbol}</p>
+                          <p className="text-[10px] truncate mt-[2px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+                            {t.name}
+                          </p>
+                        </div>
+                        {isSelected && <Check size={12} className="text-purple-400 shrink-0" />}
+                      </button>
+                    );
+                  }
+
                   return (
-                    <button
-                      key={t.address}
-                      onClick={() => {
-                        onTokenChange({
-                          address: t.address,
-                          symbol: t.symbol,
-                          decimals: t.decimals,
-                          logoURI: t.logoURI,
-                          name: t.name,
-                        });
-                        setOpen(false);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 active:bg-white/5 transition-colors"
-                    >
-                      <TokenIcon logoURI={t.logoURI} symbol={t.symbol} size={28} />
-                      <div className="flex-1 text-left min-w-0">
-                        <p className="text-[13px] font-semibold text-white">{t.symbol}</p>
-                        <p className="text-[10px] truncate mt-[2px]" style={{ color: "rgba(255,255,255,0.3)" }}>
-                          {t.name}
+                    <>
+                      <div className="mx-4 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                      {held.length > 0 && (
+                        <>
+                          <p className="px-4 pt-2 pb-1" style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}>
+                            Your tokens
+                          </p>
+                          {held.map(t => <TokenRow key={t.address} t={t} />)}
+                          <div className="mx-4 h-px my-1" style={{ background: "rgba(255,255,255,0.05)" }} />
+                          <p className="px-4 pt-1 pb-1" style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}>
+                            All tokens
+                          </p>
+                        </>
+                      )}
+                      {!held.length && (
+                        <p className="px-4 pt-2 pb-1" style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}>
+                          Tokens
                         </p>
-                      </div>
-                      {isSelected && <Check size={12} className="text-purple-400 shrink-0" />}
-                    </button>
+                      )}
+                      {others.map(t => <TokenRow key={t.address} t={t} />)}
+                    </>
                   );
-                })}
+                })()}
               </div>
             )}
           </div>
@@ -377,8 +392,10 @@ function NoRouteSuggestions({ fromToken }: { fromToken: TokenState }) {
 
 export default function BridgeView({
   address,
+  heldAddresses,
 }: {
   address: string | null;
+  heldAddresses?: Set<string>;
 }) {
   const [fromToken, setFromToken] = useState<TokenState>(nativeToken());
   const [toToken, setToToken] = useState<TokenState>(usdcToken);
@@ -864,6 +881,7 @@ export default function BridgeView({
         onTokenChange={setFromToken}
         amount={amount}
         onAmountChange={setAmount}
+        heldAddresses={heldAddresses}
       />
 
       {/* ── Flip ────────────────────────────────────────────────────────── */}

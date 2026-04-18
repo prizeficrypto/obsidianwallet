@@ -154,8 +154,15 @@ export default function TokenDetailScreen({
     }
   }
 
+  // hasMarketData — true when we have a real CoinGecko ID (not a 0x contract address fallback)
+  const hasMarketData = !!token.coingeckoId && !token.coingeckoId.startsWith("0x");
+
   const { data: market, isLoading: marketLoading } = useTokenMarket(token.coingeckoId);
-  const { data: chartData, isPlaceholderData: chartIsTransitioning } = useTokenChart(token.coingeckoId, days);
+  const {
+    data: chartData,
+    isPlaceholderData: chartIsTransitioning,
+    isLoading: chartLoading,
+  } = useTokenChart(token.coingeckoId, days);
 
   const handleShare = useCallback(async () => {
     if (shareState !== "idle") return;
@@ -311,8 +318,8 @@ export default function TokenDetailScreen({
         {/* Chart — interactive */}
         <div className="px-2">
           <InteractiveLineChart
-            data={chartData ?? null}
-            isLoading={!chartData && !chartIsTransitioning}
+            data={chartData && chartData.length > 0 ? chartData : null}
+            isLoading={chartLoading && !chartIsTransitioning}
             height={130}
             dimmed={chartIsTransitioning}
             onScrub={handleScrub}
@@ -394,7 +401,7 @@ export default function TokenDetailScreen({
             Market
           </p>
           <div className="mt-0.5">
-            {marketLoading ? (
+            {marketLoading && hasMarketData ? (
               <>
                 <StatSkeleton /><StatDivider />
                 <StatSkeleton /><StatDivider />

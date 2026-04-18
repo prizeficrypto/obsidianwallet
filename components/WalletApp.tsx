@@ -60,6 +60,14 @@ export default function WalletApp() {
   const { data: tokenBalances } = useWorldChainTokenBalances(wallet.address, prices);
   const tokenBalancesUSD = (tokenBalances ?? []).reduce((sum, t) => sum + t.balanceUSD, 0);
   const totalUSD = useTotalBalance(balances) + (wldBalance?.usd ?? 0) + tokenBalancesUSD;
+
+  // Held token contract addresses — used to surface user's tokens first in the swap picker
+  const heldAddresses = useMemo(() => {
+    const set = new Set<string>();
+    if (wldBalance) set.add("0x2cFc85d8E48F8EAB294be644d9E25C3030863003".toLowerCase());
+    for (const t of tokenBalances ?? []) set.add(t.contractAddress.toLowerCase());
+    return set;
+  }, [wldBalance, tokenBalances]);
   const isBalanceLoading = balancesLoading || !prices;
   const isEmpty = !isBalanceLoading && totalUSD === 0;
 
@@ -196,7 +204,7 @@ export default function WalletApp() {
             )}
 
             {navTab === "swap" && (
-              <BridgeView address={wallet.address} />
+              <BridgeView address={wallet.address} heldAddresses={heldAddresses} />
             )}
           </main>
 
