@@ -99,7 +99,7 @@ function CurrencyPicker({
   onClose,
 }: {
   current: string;
-  onSelect: (c: "USD" | "EUR" | "GBP") => void;
+  onSelect: (c: "USD" | "EUR" | "GBP" | "JPY" | "KRW" | "ARS" | "THB" | "CHF" | "CAD" | "BRL" | "TRY" | "INR" | "SGD" | "HKD") => void;
   onClose: () => void;
 }) {
   return (
