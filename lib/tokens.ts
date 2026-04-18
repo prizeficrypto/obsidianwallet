@@ -16,6 +16,17 @@ export interface CuratedToken {
 }
 
 export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
+  // ── World Chain native assets ─────────────────────────────────────────────
+  {
+    address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+    symbol: "WLD",
+    name: "Worldcoin",
+    decimals: 18,
+    chainId: 480,
+    logoURI:
+      "https://assets.coingecko.com/coins/images/31069/small/worldcoin.jpeg",
+  },
+
   // ── Stablecoins & core assets ─────────────────────────────────────────────
   {
     address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",

@@ -18,6 +18,7 @@ export interface SearchToken {
 
 /** Maps token symbol → CoinGecko ID for price lookups */
 const COINGECKO_ID: Record<string, string> = {
+  "WLD":    "worldcoin-wld",
   "USDC.e": "usd-coin",
   "WETH":   "ethereum",
   "WBTC":   "wrapped-bitcoin",
