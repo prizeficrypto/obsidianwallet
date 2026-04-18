@@ -25,6 +25,7 @@ import ActivityScreen from "./screens/ActivityScreen";
 import PortfolioScreen from "./screens/PortfolioScreen";
 import TokenDetailScreen from "./screens/TokenDetailScreen";
 import { useReturnValue } from "@/hooks/useReturnValue";
+import { useWorldChainTokenBalances } from "@/hooks/useWorldChainTokenBalances";
 import type { SelectedToken } from "@/types/token";
 
 type NavTab = "home" | "swap" | "activity" | "portfolio" | "settings";
@@ -56,7 +57,9 @@ export default function WalletApp() {
   const { data: balances, isLoading: balancesLoading } = useChainBalances(wallet.address, prices);
   const wldPriceUSD = prices?.["worldcoin-wld"]?.usd ?? 0;
   const { data: wldBalance } = useWldBalance(wallet.address, wldPriceUSD);
-  const totalUSD = useTotalBalance(balances) + (wldBalance?.usd ?? 0);
+  const { data: tokenBalances } = useWorldChainTokenBalances(wallet.address, prices);
+  const tokenBalancesUSD = (tokenBalances ?? []).reduce((sum, t) => sum + t.balanceUSD, 0);
+  const totalUSD = useTotalBalance(balances) + (wldBalance?.usd ?? 0) + tokenBalancesUSD;
   const isBalanceLoading = balancesLoading || !prices;
   const isEmpty = !isBalanceLoading && totalUSD === 0;
 
@@ -172,6 +175,7 @@ export default function WalletApp() {
                   address={wallet.address}
                   wldBalance={wldBalance}
                   wldPriceChange={prices?.["worldcoin-wld"]?.usd_24h_change}
+                  tokenBalances={tokenBalances}
                   onTokenTap={setSelectedToken}
                 />
               </>

@@ -7,6 +7,7 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { useCurrency } from "@/hooks/useCurrency";
 import type { ChainBalance } from "@/hooks/useChainBalances";
 import type { WldBalance } from "@/hooks/useWldBalance";
+import type { ERC20Balance } from "@/hooks/useWorldChainTokenBalances";
 import type { SelectedToken } from "@/types/token";
 
 interface ChainListProps {
@@ -15,6 +16,7 @@ interface ChainListProps {
   address?: string | null;
   wldBalance?: WldBalance;
   wldPriceChange?: number;
+  tokenBalances?: ERC20Balance[];
   onTokenTap?: (token: SelectedToken) => void;
 }
 
@@ -175,7 +177,7 @@ function SectionLabel({ label, count }: { label: string; count?: number }) {
   );
 }
 
-export default function ChainList({ balances, isLoading, wldBalance, wldPriceChange, onTokenTap }: ChainListProps) {
+export default function ChainList({ balances, isLoading, wldBalance, wldPriceChange, tokenBalances, onTokenTap }: ChainListProps) {
   const [showAll, setShowAll] = useState(false);
   const hideBalances = useSettingsStore((s) => s.hideBalances);
   const { format } = useCurrency();
@@ -269,6 +271,34 @@ export default function ChainList({ balances, isLoading, wldBalance, wldPriceCha
         balanceUSD: worldChainBalance.usdValue,
         priceChange24h: worldChainBalance.priceChange24h ?? 0,
         explorerUrl: worldChainBalance.chain.explorerUrl,
+      },
+    });
+  }
+
+  // ERC-20 tokens from multicall
+  for (const t of tokenBalances ?? []) {
+    assets.push({
+      id: t.contractAddress,
+      symbol: t.symbol,
+      icon: <TokenIcon logoURI={t.logoURI} symbol={t.symbol} size={36} bg="#161616" />,
+      balanceStr: fmtBalance(t.balance, t.symbol),
+      network: "World Chain",
+      fiatValue: t.balanceUSD,
+      fiatDisplay: format(t.balanceUSD),
+      priceChange24h: t.priceChange24h,
+      dimmed: t.balanceUSD === 0,
+      isStale: false,
+      disambiguate: false,
+      token: {
+        symbol: t.symbol,
+        coingeckoId: t.coingeckoId ?? t.contractAddress,
+        logoURI: t.logoURI,
+        network: "World Chain",
+        balance: t.balance,
+        balanceUSD: t.balanceUSD,
+        priceChange24h: t.priceChange24h,
+        explorerUrl: "https://worldscan.org",
+        contractAddress: t.contractAddress,
       },
     });
   }

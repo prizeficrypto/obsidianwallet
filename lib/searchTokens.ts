@@ -13,6 +13,7 @@ export interface SearchToken {
   name: string;
   logoURI: string;
   contractAddress: string;
+  decimals: number;
 }
 
 /** Maps token symbol → CoinGecko ID for price lookups */
@@ -73,6 +74,7 @@ export const SEARCH_TOKENS: SearchToken[] = WORLD_CHAIN_TOKENS.map((t) => {
     name: t.name,
     logoURI: t.logoURI,
     contractAddress: t.address,
+    decimals: t.decimals,
   };
 });
 

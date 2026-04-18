@@ -2,10 +2,15 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { FALLBACK_PRICES, type PriceMap } from "@/lib/prices";
+import { SEARCH_TOKEN_CG_IDS } from "@/lib/searchTokens";
+import { COINGECKO_IDS } from "@/lib/chains";
+
+// All CoinGecko IDs we need — base chain tokens + all World Chain ERC-20s.
+// Fetched in one request, cached for 60s.
+const ALL_IDS = [...new Set([...COINGECKO_IDS, ...SEARCH_TOKEN_CG_IDS])].join(",");
 
 async function fetchPrices(): Promise<PriceMap> {
-  // Use our server-side proxied route to avoid CORS/rate-limit issues
-  const res = await fetch("/api/prices");
+  const res = await fetch(`/api/prices?ids=${encodeURIComponent(ALL_IDS)}`);
   if (!res.ok) return FALLBACK_PRICES;
   return res.json();
 }
