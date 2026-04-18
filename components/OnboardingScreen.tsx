@@ -149,11 +149,11 @@ function TokenRowsArt() {
           marginTop: 10,
           fontSize: 10,
           color: "rgba(255,255,255,0.18)",
-          letterSpacing: "0.07em",
+          letterSpacing: "0.04em",
           fontWeight: 500,
         }}
       >
-        AND 47 MORE ON WORLD CHAIN
+        50+ tokens on World Chain
       </p>
     </div>
   );
@@ -269,22 +269,22 @@ const SLIDES: Slide[] = [
     id: "product",
     variant: "art",
     art: <AllocationArt />,
-    title: "Invest and track\non World Chain.",
-    body: "Strata is a portfolio and investing app built for World Chain. Not a bridge, not a multichain wallet — just your holdings, clearly.",
+    title: "Your World Chain\nportfolio.",
+    body: "Obsidian tracks your holdings, prices, and performance. Built for World Chain — nothing else.",
   },
   {
     id: "trade",
     variant: "art",
     art: <TokenRowsArt />,
-    title: "Trade 50+ tokens,\ndirectly.",
-    body: "Swap on World Chain via Uniswap V3. Best available rate, no bridges, no leaving the app.",
+    title: "Trade any token,\ndirectly.",
+    body: "Swap across 50+ World Chain tokens at the best available rate via Uniswap V3. No bridges.",
   },
   {
     id: "insights",
     variant: "art",
     art: <InsightArt />,
-    title: "Know what\nshifted.",
-    body: "After markets move, Strata shows which of your holdings led the change — and by how much. Worth checking after every big session.",
+    title: "Know what\nmoved.",
+    body: "See which holdings drove your gains or losses after every market session. One card, clearly explained.",
   },
   {
     id: "honest",

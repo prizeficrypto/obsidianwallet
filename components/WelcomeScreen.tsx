@@ -8,17 +8,16 @@ interface WelcomeScreenProps {
   isConnected?: boolean;
 }
 
-// ── Strata geometric mark ─────────────────────────────────────────────────────
-// Three receding bars, each narrower and dimmer than the last —
-// a literal representation of geological strata / sedimentary layers.
-function StrataMark({ size = 1 }: { size?: number }) {
-  const w = Math.round(52 * size);
-  const h = Math.round(38 * size);
+// ── Obsidian mark ─────────────────────────────────────────────────────────────
+// Two stacked diamond facets — upper bright, lower dim —
+// referencing the light-catching planes of volcanic glass.
+function ObsidianMark({ size = 1 }: { size?: number }) {
+  const w = Math.round(24 * size);
+  const h = Math.round(32 * size);
   return (
-    <svg width={w} height={h} viewBox="0 0 52 38" fill="none">
-      <rect width="52" height="10" rx="5" fill="white" fillOpacity="0.88" />
-      <rect x="8" y="14" width="36" height="10" rx="5" fill="white" fillOpacity="0.52" />
-      <rect x="18" y="28" width="16" height="10" rx="5" fill="white" fillOpacity="0.26" />
+    <svg width={w} height={h} viewBox="0 0 24 32" fill="none">
+      <path d="M12 0 L24 16 L12 20 L0 16 Z" fill="white" fillOpacity="0.9" />
+      <path d="M12 20 L24 16 L12 32 L0 16 Z" fill="white" fillOpacity="0.3" />
     </svg>
   );
 }
@@ -37,7 +36,7 @@ function EmptyWalletCard({
   return (
     <div className="mx-4 mt-3 rounded-2xl overflow-hidden p-6" style={{ background: "#161616" }}>
       <div className="flex justify-center mb-6">
-        <StrataMark size={0.85} />
+        <ObsidianMark size={0.85} />
       </div>
 
       <h2
@@ -89,37 +88,62 @@ function ConnectCard({
       className="flex flex-col min-h-screen select-none"
       style={{ background: "#080808" }}
     >
-      {/* ── Brand area (vertically centered, slightly above midpoint) ── */}
-      <div className="flex-1 flex flex-col items-center justify-center" style={{ paddingBottom: "18vh" }}>
-        <div className="mb-7">
-          <StrataMark size={1.15} />
-        </div>
+      {/* ── Brand block — slightly above center ── */}
+      <div
+        className="flex-1 flex flex-col items-center justify-center"
+        style={{ paddingBottom: "16vh" }}
+      >
+        <ObsidianMark size={1.2} />
 
         <h1
           style={{
-            fontSize: 32,
+            fontSize: 34,
             fontWeight: 700,
             color: "white",
-            letterSpacing: "-0.04em",
+            letterSpacing: "-0.045em",
             lineHeight: 1,
+            marginTop: 18,
           }}
         >
-          Strata
+          Obsidian
         </h1>
+
+        {/* Separator — makes the space below the name feel chosen */}
+        <div
+          style={{
+            width: 24,
+            height: 1,
+            background: "rgba(255,255,255,0.08)",
+            margin: "12px 0 11px",
+          }}
+        />
+
         <p
           style={{
             fontSize: 13,
             fontWeight: 400,
-            color: "rgba(255,255,255,0.28)",
-            marginTop: 9,
+            color: "rgba(255,255,255,0.32)",
+            letterSpacing: "-0.005em",
           }}
         >
-          World Chain portfolio
+          Your World Chain portfolio
         </p>
       </div>
 
       {/* ── CTA pinned to bottom ── */}
-      <div className="px-6 pb-10 space-y-3">
+      <div className="px-6 pb-10">
+        <p
+          className="text-center"
+          style={{
+            fontSize: 11,
+            color: "rgba(255,255,255,0.18)",
+            letterSpacing: "0.02em",
+            marginBottom: 12,
+          }}
+        >
+          Non-custodial · Secured by World ID
+        </p>
+
         <button
           onClick={onConnect}
           disabled={isLoading}
@@ -135,7 +159,7 @@ function ConnectCard({
               Connecting…
             </>
           ) : isInWorldApp ? (
-            "Sign in with World ID"
+            "Continue with World ID"
           ) : (
             "Connect wallet"
           )}
@@ -144,7 +168,7 @@ function ConnectCard({
         {!isInWorldApp && (
           <p
             className="text-center"
-            style={{ fontSize: 11, color: "rgba(255,255,255,0.16)" }}
+            style={{ fontSize: 11, color: "rgba(255,255,255,0.14)", marginTop: 12 }}
           >
             Open in World App for the full experience
           </p>
