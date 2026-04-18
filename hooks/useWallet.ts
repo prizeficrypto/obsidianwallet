@@ -141,7 +141,7 @@ export function useWallet() {
       //    data is WalletAuthResult { address, message, signature }
       const result = await MiniKit.walletAuth({
         nonce,
-        statement: "Sign in to Strata Wallet",
+        statement: "Sign in to Obsidian",
         expirationTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
 
@@ -155,8 +155,11 @@ export function useWallet() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: data.message,
-          signature: data.signature,
+          payload: {
+            address: data.address,
+            message: data.message,
+            signature: data.signature,
+          },
           nonce,
         }),
       });
