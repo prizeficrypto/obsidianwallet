@@ -498,17 +498,25 @@ export default function BridgeView({
           chainId: WORLD_CHAIN_ID,
           transactions,
         });
-        const data = res.data as { userOpHash?: string; transactionHash?: string } | null;
-        const hash = data?.userOpHash ?? data?.transactionHash;
+        // MiniKit v2 returns userOpHash directly on the result object
+        const hash = (res as { userOpHash?: string })?.userOpHash;
         if (hash) {
           setTxHash(hash);
           setStep("success");
         } else {
-          setErrorMsg("Transaction rejected.");
+          setErrorMsg("Transaction was not confirmed. Please try again.");
           setStep("error");
         }
       } catch (e) {
-        setErrorMsg(e instanceof Error ? e.message : "Transaction failed");
+        const raw = e instanceof Error ? e.message : String(e);
+        // invalid_contract means the swap router isn't whitelisted yet in the
+        // World Developer Portal — surface a clear, actionable message.
+        const msg = raw === "invalid_contract"
+          ? "Swap not permitted yet. The Uniswap router must be whitelisted in the World Developer Portal under this app's permitted contracts."
+          : raw === "user_rejected"
+          ? "Swap cancelled."
+          : raw;
+        setErrorMsg(msg);
         setStep("error");
       } finally {
         setIsExecuting(false);

@@ -66,7 +66,11 @@ export function useWorldChainTokenBalances(
     queryFn: async () => {
       if (!address || !prices) return [];
 
-      const contracts = SEARCH_TOKENS.map((token) => ({
+      // Exclude WLD — it's tracked separately by useWldBalance to avoid duplication
+      const WLD_ADDRESS = "0x2cFc85d8E48F8EAB294be644d9E25C3030863003".toLowerCase();
+      const tokens = SEARCH_TOKENS.filter(t => t.contractAddress.toLowerCase() !== WLD_ADDRESS);
+
+      const contracts = tokens.map((token) => ({
         address: token.contractAddress as `0x${string}`,
         abi: BALANCE_OF_ABI,
         functionName: "balanceOf" as const,
@@ -80,9 +84,9 @@ export function useWorldChainTokenBalances(
 
       const balances: ERC20Balance[] = [];
 
-      for (let i = 0; i < SEARCH_TOKENS.length; i++) {
+      for (let i = 0; i < tokens.length; i++) {
         const result = results[i];
-        const token = SEARCH_TOKENS[i];
+        const token = tokens[i];
 
         if (result.status !== "success") continue;
         const raw = result.result as bigint;
