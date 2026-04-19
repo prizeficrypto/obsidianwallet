@@ -117,6 +117,7 @@ export default function WalletApp() {
           address={wallet.address}
           isInWorldApp={wallet.isInWorldApp}
           onClose={() => setFlow(null)}
+          balanceMap={balanceMap}
         />
       ) : flow === "receive" && wallet.address ? (
         <ReceiveModal address={wallet.address} onClose={() => setFlow(null)} />

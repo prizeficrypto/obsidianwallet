@@ -12,6 +12,8 @@ interface SendModalProps {
   address: string;
   isInWorldApp: boolean;
   onClose: () => void;
+  /** address.toLowerCase() → human-readable balance */
+  balanceMap?: Record<string, number>;
 }
 
 type Step = "input" | "confirm" | "success" | "error";
@@ -62,7 +64,7 @@ function parseRawAmount(amount: string, decimals: number): string {
   return `0x${raw.toString(16)}`;
 }
 
-export default function SendModal({ address, isInWorldApp, onClose }: SendModalProps) {
+export default function SendModal({ address, isInWorldApp, onClose, balanceMap }: SendModalProps) {
   const { addPending } = useTxStore();
   const [step, setStep] = useState<Step>("input");
   const [selectedToken, setSelectedToken] = useState<TokenOption | null>(null);
@@ -271,7 +273,27 @@ export default function SendModal({ address, isInWorldApp, onClose }: SendModalP
 
           {/* Amount */}
           <div>
-            <p className="text-[11px] text-white/30 uppercase tracking-wider mb-2">Amount</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] text-white/30 uppercase tracking-wider">Amount</p>
+              {(() => {
+                const bal = token ? balanceMap?.[token.address.toLowerCase()] : undefined;
+                if (bal === undefined) return null;
+                return (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[12px]" style={{ color: "rgba(255,255,255,0.35)" }}>
+                      {bal.toLocaleString(undefined, { maximumFractionDigits: 6 })} {token?.symbol}
+                    </span>
+                    <button
+                      onClick={() => setAmount(bal.toString())}
+                      className="text-[11px] font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform"
+                      style={{ background: "rgba(124,111,232,0.18)", color: "rgba(155,140,255,0.95)" }}
+                    >
+                      Max
+                    </button>
+                  </div>
+                );
+              })()}
+            </div>
             <div className="rounded-2xl px-4 py-3.5 flex items-center gap-3" style={{ background: "#161616" }}>
               <input
                 type="number"
