@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 
-// Use app.universal.xyz directly — www.universal.xyz 302-redirects to here,
-// and both require browser-like headers to pass Vercel bot detection.
 const UP_BASE = "https://app.universal.xyz/api/v1";
 
 const BROWSER_HEADERS = {
@@ -12,31 +10,49 @@ const BROWSER_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
+// ── Server-side cache — avoids hammering UP API on every keystroke ────────────
+const cache = new Map<string, { data: unknown; at: number }>();
+const CACHE_TTL = 20_000; // 20 s — quotes are short-lived but reuse within a session
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const cacheKey = JSON.stringify(body);
+
+    // Return cached quote if still fresh
+    const hit = cache.get(cacheKey);
+    if (hit && Date.now() - hit.at < CACHE_TTL) {
+      return NextResponse.json(hit.data);
+    }
+
     const res = await fetch(`${UP_BASE}/quote`, {
       method: "POST",
       headers: BROWSER_HEADERS,
       body: JSON.stringify(body),
     });
+
+    // On 429 return a structured error the client can detect
     if (res.status === 429) {
       return NextResponse.json(
-        { error: "Rate limited – please wait a moment and try again." },
+        { error: "rate_limited" },
         { status: 429 }
       );
     }
+
     const text = await res.text();
     let data: unknown;
     try {
       data = JSON.parse(text);
     } catch {
-      // UP API returned non-JSON (bot check page, etc.)
       return NextResponse.json(
         { error: `UP API returned non-JSON (status ${res.status})` },
         { status: 502 }
       );
     }
+
+    // Cache successful responses only
+    if (res.ok) cache.set(cacheKey, { data, at: Date.now() });
+
     return NextResponse.json(data, { status: res.status });
   } catch (e) {
     return NextResponse.json(

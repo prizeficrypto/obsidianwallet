@@ -3,6 +3,7 @@
 import type { Mover } from "@/lib/returnValue";
 import ChainIcon, { TokenIcon } from "@/components/ChainIcon";
 import { WLD_LOGO } from "@/hooks/useWldBalance";
+import { useTranslation } from "@/hooks/useTranslation";
 
 /**
  * Compact card showing which of the user's holdings moved most
@@ -24,6 +25,7 @@ const ID_TO_CHAIN_ICON: Record<string, string> = {
 };
 
 export default function MoversCard({ movers }: { movers: Mover[] }) {
+  const { t } = useTranslation();
   if (movers.length === 0) return null;
 
   return (
@@ -38,7 +40,7 @@ export default function MoversCard({ movers }: { movers: Mover[] }) {
           marginBottom: 8,
         }}
       >
-        Movers since last visit
+        {t("movers.title")}
       </p>
 
       <div

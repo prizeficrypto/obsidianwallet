@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { formatUSD } from "@/lib/format";
+import { useCurrency } from "@/hooks/useCurrency";
 import type { SinceYouLeftData, Mover } from "@/lib/returnValue";
 
 /**
@@ -24,6 +24,7 @@ export default function SinceYouLeft({
 }) {
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
+  const { format } = useCurrency();
 
   // Gentle fade in on mount
   useEffect(() => {
@@ -129,7 +130,7 @@ export default function SinceYouLeft({
               color: changeColor,
             }}
           >
-            {sign}{formatUSD(Math.abs(data.changeUSD))}
+            {sign}{format(Math.abs(data.changeUSD))}
           </span>
           <span
             className="tabular-nums"

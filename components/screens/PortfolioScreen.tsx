@@ -2,7 +2,9 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
-import { formatUSD, formatScrubTime } from "@/lib/format";
+import { formatScrubTime } from "@/lib/format";
+import { useCurrency } from "@/hooks/useCurrency";
+import { useTranslation } from "@/hooks/useTranslation";
 import {
   computePortfolioInsights,
   generateMarketEvents,
@@ -49,13 +51,6 @@ const TIME_RANGES: { label: string; days: Days }[] = [
   { label: "1Y", days: 365 },
 ];
 
-const PERIOD_LABELS: Record<string, string> = {
-  "1": "today",
-  "7": "this week",
-  "30": "this month",
-  "365": "this year",
-};
-
 // ── Component ───────────────────────────────────────────────────────
 
 export default function PortfolioScreen({
@@ -69,6 +64,15 @@ export default function PortfolioScreen({
   const [chartDays, setChartDays] = useState<Days>(1);
   const [scrubPoint, setScrubPoint] = useState<ScrubPoint | null>(null);
   const [selectedSlice, setSelectedSlice] = useState<string | null>(null);
+  const { format } = useCurrency();
+  const { t } = useTranslation();
+
+  const PERIOD_LABELS: Record<string, string> = {
+    "1": t("period.today"),
+    "7": t("period.week"),
+    "30": t("period.month"),
+    "365": t("period.year"),
+  };
 
   // "Since you last opened" — use shared snapshotStore so we get the same
   // price-based return calculation (not raw balance diff) as the home screen.
@@ -227,7 +231,7 @@ export default function PortfolioScreen({
                 lineHeight: 1.1,
               }}
             >
-              {formatUSD(displayValue)}
+              {format(displayValue)}
             </p>
 
             {isScrubbing ? (
@@ -253,7 +257,7 @@ export default function PortfolioScreen({
                   }}
                 >
                   {chartChange.pct >= 0 ? "+" : "\u2013"}
-                  {formatUSD(Math.abs(chartChange.usd))}
+                  {format(Math.abs(chartChange.usd))}
                 </span>
                 <span
                   className="tabular-nums"
@@ -290,7 +294,7 @@ export default function PortfolioScreen({
                   }}
                 >
                   {returnDelta.changeUSD >= 0 ? "+" : "\u2013"}
-                  {formatUSD(Math.abs(returnDelta.changeUSD))} ({returnDelta.changePct >= 0 ? "+" : ""}{returnDelta.changePct.toFixed(1)}%)
+                  {format(Math.abs(returnDelta.changeUSD))} ({returnDelta.changePct >= 0 ? "+" : ""}{returnDelta.changePct.toFixed(1)}%)
                 </span>
                 <span
                   style={{
@@ -357,7 +361,7 @@ export default function PortfolioScreen({
       {/* Allocation section */}
       {showAllocation && (
         <div className="mx-4 mt-5">
-          <SectionLabel label="Allocation" />
+          <SectionLabel label={t("portfolio.allocation")} />
           <div className="flex items-center gap-4 mt-2">
             <DonutChart
               slices={allocations}
@@ -377,7 +381,7 @@ export default function PortfolioScreen({
       {/* Top movers section */}
       {topMovers.length > 0 && !isLoading && (
         <div className="mx-4 mt-5">
-          <SectionLabel label="Movers" />
+          <SectionLabel label={t("portfolio.movers")} />
           <div className="flex gap-2 mt-2">
             {topMovers.map((m) => {
               const up = m.pct >= 0;
@@ -423,7 +427,7 @@ export default function PortfolioScreen({
       {/* Insights + market events section */}
       {hasInsights && (
         <div className="mx-4 mt-5">
-          <SectionLabel label="Today" />
+          <SectionLabel label={t("portfolio.today")} />
           <div
             className="rounded-[10px] py-2.5 px-3 mt-2"
             style={{ background: "rgba(255,255,255,0.02)" }}
@@ -587,6 +591,8 @@ function AllocationLegend({
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }) {
+  const { format } = useCurrency();
+  const { t } = useTranslation();
   const MAX_SHOWN = 5;
   const shown = slices.slice(0, MAX_SHOWN);
   const rest = slices.slice(MAX_SHOWN);
@@ -651,7 +657,7 @@ function AllocationLegend({
                 transition: "color 0.15s ease",
               }}
             >
-              {formatUSD(slice.usd, true)}
+              {format(slice.usd)}
             </span>
           </button>
         );
@@ -669,7 +675,7 @@ function AllocationLegend({
               color: "rgba(255,255,255,0.35)",
             }}
           >
-            Other
+            {t("portfolio.other")}
           </span>
           <span
             className="tabular-nums ml-auto flex-shrink-0"
@@ -687,7 +693,7 @@ function AllocationLegend({
               textAlign: "right",
             }}
           >
-            {formatUSD(otherUsd, true)}
+            {format(otherUsd)}
           </span>
         </div>
       )}

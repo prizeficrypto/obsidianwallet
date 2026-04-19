@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowLeft, ChevronRight, Shield, Globe, Eye, EyeOff, LogOut, ExternalLink, Vibrate, Check, Languages } from "lucide-react";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useI18nStore, type Language } from "@/store/i18nStore";
+import { useTranslation } from "@/hooks/useTranslation";
 import { formatAddress } from "@/lib/format";
 import type { WalletState } from "@/hooks/useWallet";
 
@@ -294,6 +295,7 @@ function CurrencyPicker({
 export default function SettingsScreen({ wallet, onBack }: SettingsScreenProps) {
   const { hideBalances, setHideBalances, haptics, setHaptics, currency, setCurrency } = useSettingsStore();
   const { language, setLanguage } = useI18nStore();
+  const { t } = useTranslation();
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
   const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
   const currentLang = LANGUAGE_OPTIONS.find((l) => l.code === language);
@@ -316,7 +318,7 @@ export default function SettingsScreen({ wallet, onBack }: SettingsScreenProps) 
           className="text-white font-bold"
           style={{ fontSize: 20, letterSpacing: "-0.02em" }}
         >
-          Settings
+          {t("settings.title")}
         </h1>
       </div>
 
@@ -359,11 +361,11 @@ export default function SettingsScreen({ wallet, onBack }: SettingsScreenProps) 
         </div>
 
         {/* Preferences */}
-        <SectionHeader title="Preferences" />
+        <SectionHeader title={t("settings.preferences")} />
         <SettingGroup>
           <SettingRow
-            label="Hide Balances"
-            value={hideBalances ? "On" : "Off"}
+            label={t("settings.hideBalances")}
+            value={hideBalances ? t("settings.on") : t("settings.off")}
             icon={hideBalances
               ? <EyeOff size={15} className="text-white/50" />
               : <Eye size={15} className="text-white/50" />
@@ -372,21 +374,21 @@ export default function SettingsScreen({ wallet, onBack }: SettingsScreenProps) 
           />
           <Divider />
           <SettingRow
-            label="Haptics"
-            value={haptics ? "On" : "Off"}
+            label={t("settings.haptics")}
+            value={haptics ? t("settings.on") : t("settings.off")}
             icon={<Vibrate size={15} className="text-white/50" />}
             onPress={() => setHaptics(!haptics)}
           />
           <Divider />
           <SettingRow
-            label="Currency"
+            label={t("settings.currency")}
             value={currency}
             icon={<Globe size={15} className="text-white/50" />}
             onPress={() => setCurrencyPickerOpen(true)}
           />
           <Divider />
           <SettingRow
-            label="Language"
+            label={t("settings.language")}
             value={currentLang?.native ?? "English"}
             icon={<Languages size={15} className="text-white/50" />}
             onPress={() => setLanguagePickerOpen(true)}
@@ -394,30 +396,30 @@ export default function SettingsScreen({ wallet, onBack }: SettingsScreenProps) 
         </SettingGroup>
 
         {/* Security */}
-        <SectionHeader title="Security" />
+        <SectionHeader title={t("settings.security")} />
         <SettingGroup>
           <SettingRow
-            label="World ID Verification"
-            value={wallet.isOrbVerified ? "Orb Verified" : "None"}
+            label={t("settings.worldId")}
+            value={wallet.isOrbVerified ? t("settings.orbVerified") : t("settings.none")}
             icon={<Shield size={15} className="text-white/50" />}
           />
         </SettingGroup>
 
         {/* Resources */}
-        <SectionHeader title="Links" />
+        <SectionHeader title={t("settings.links")} />
         <SettingGroup>
           <SettingRow
-            label="Worldscan Explorer"
+            label={t("settings.explorer")}
             icon={<ExternalLink size={15} className="text-white/50" />}
             onPress={() => window.open("https://worldscan.org", "_blank")}
           />
         </SettingGroup>
 
         {/* Account */}
-        <SectionHeader title="Account" />
+        <SectionHeader title={t("settings.account")} />
         <SettingGroup>
           <SettingRow
-            label="Disconnect"
+            label={t("settings.disconnect")}
             icon={<LogOut size={15} className="text-red-400" />}
             danger
             onPress={wallet.disconnect}

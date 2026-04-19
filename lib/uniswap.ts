@@ -218,6 +218,28 @@ export async function getBestQuote(
 
 // ── Calldata builders ────────────────────────────────────────────────────────
 
+const ERC20_TRANSFER_ABI = [
+  {
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    name: "transfer",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+/** ERC-20 transfer calldata */
+export function buildTransferCalldata(to: string, amount: bigint): `0x${string}` {
+  return encodeFunctionData({
+    abi: ERC20_TRANSFER_ABI,
+    functionName: "transfer",
+    args: [to as `0x${string}`, amount],
+  });
+}
+
 /** ERC-20 approve calldata */
 export function buildApproveCalldata(spender: string, amount: bigint): `0x${string}` {
   return encodeFunctionData({

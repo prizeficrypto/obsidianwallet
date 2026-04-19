@@ -1,7 +1,7 @@
 "use client";
 
 import { Skeleton } from "./Skeleton";
-import { formatUSD } from "@/lib/format";
+import { useCurrency } from "@/hooks/useCurrency";
 import type { TokenBalance } from "@/types/chain";
 
 interface TokenRowProps {
@@ -10,6 +10,7 @@ interface TokenRowProps {
 }
 
 export function TokenRow({ token, onClick }: TokenRowProps) {
+  const { format } = useCurrency();
   return (
     <button
       onClick={onClick}
@@ -42,7 +43,7 @@ export function TokenRow({ token, onClick }: TokenRowProps) {
         <p className="text-sm font-semibold text-white">
           {token.balanceFormatted} {token.symbol}
         </p>
-        <p className="text-xs text-white/30">{formatUSD(token.balanceUSD)}</p>
+        <p className="text-xs text-white/30">{format(token.balanceUSD)}</p>
       </div>
     </button>
   );

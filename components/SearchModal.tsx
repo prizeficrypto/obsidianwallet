@@ -6,7 +6,8 @@ import { Search, X, ArrowLeft } from "lucide-react";
 import { useWatchlistStore } from "@/store/watchlistStore";
 import { SEARCH_TOKENS, SEARCH_TOKEN_CG_IDS } from "@/lib/searchTokens";
 import ChainIcon, { TokenIcon } from "@/components/ChainIcon";
-import { formatUSD, formatPercent } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
+import { useCurrency } from "@/hooks/useCurrency";
 import type { ChainBalance } from "@/hooks/useChainBalances";
 import type { WldBalance } from "@/hooks/useWldBalance";
 import type { PriceMap } from "@/lib/prices";
@@ -14,13 +15,6 @@ import type { SelectedToken } from "@/types/token";
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
 
-function fmtPrice(n: number): string {
-  if (n <= 0) return "—";
-  if (n >= 1000) return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  if (n >= 1) return `$${n.toFixed(2)}`;
-  if (n >= 0.01) return `$${n.toFixed(4)}`;
-  return `$${n.toFixed(6)}`;
-}
 
 function fmtBal(value: number, symbol: string): string {
   if (value === 0) return `0 ${symbol}`;
@@ -105,16 +99,26 @@ function ResultRow({
   result: SearchResult;
   onTap: () => void;
 }) {
+  const { format, rate, symbol: currSym } = useCurrency();
   const isHolding = result.kind === "holding";
   const isUp = result.change24h >= 0;
   const changeColor = isUp ? "#4ade80" : "#f87171";
   const hasPct = Math.abs(result.change24h) >= 0.01;
 
+  function fmtPriceConverted(n: number): string {
+    if (n <= 0) return "—";
+    const converted = n * rate;
+    if (converted >= 1000) return format(n);
+    if (converted >= 1) return `${currSym}${converted.toFixed(2)}`;
+    if (converted >= 0.01) return `${currSym}${converted.toFixed(4)}`;
+    return `${currSym}${converted.toFixed(6)}`;
+  }
+
   const displayValue = isHolding
     ? (result as HoldingResult).balanceUSD > 0
-      ? formatUSD((result as HoldingResult).balanceUSD)
+      ? format((result as HoldingResult).balanceUSD)
       : "—"
-    : fmtPrice(result.priceUSD);
+    : fmtPriceConverted(result.priceUSD);
 
   const subValue = isHolding
     ? fmtBal((result as HoldingResult).balance, result.symbol)

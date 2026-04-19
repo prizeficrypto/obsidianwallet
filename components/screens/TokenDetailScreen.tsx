@@ -15,6 +15,7 @@ import InteractiveLineChart, { type ScrubPoint } from "@/components/InteractiveL
 import { renderPnlCard, sharePnlCard, type PnlCardData } from "@/lib/pnlCard";
 import { formatScrubTime } from "@/lib/format";
 import { useCurrency } from "@/hooks/useCurrency";
+import { TOKEN_DESCRIPTIONS } from "@/lib/tokenDescriptions";
 import type { SelectedToken } from "@/types/token";
 
 function fmtBalance(value: number, symbol: string): string {
@@ -560,6 +561,59 @@ export default function TokenDetailScreen({
             )}
           </div>
         </div>
+
+        {/* About section */}
+        {(() => {
+          const desc = TOKEN_DESCRIPTIONS[token.coingeckoId];
+          if (!desc) return null;
+          return (
+            <>
+              <div className="mt-6" style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
+              <div className="px-4 pt-4 pb-6">
+                <p
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.07em",
+                    textTransform: "uppercase",
+                    color: "rgba(255,255,255,0.22)",
+                  }}
+                >
+                  About
+                </p>
+                <p
+                  className="mt-2"
+                  style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.85)", lineHeight: 1.35 }}
+                >
+                  {desc.title}
+                </p>
+                <p
+                  className="mt-2"
+                  style={{ fontSize: 13, fontWeight: 400, color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}
+                >
+                  {desc.body}
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {desc.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 500,
+                        color: "rgba(255,255,255,0.4)",
+                        background: "rgba(255,255,255,0.06)",
+                        borderRadius: 6,
+                        padding: "3px 8px",
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </>
+          );
+        })()}
 
       </div>
     </div>

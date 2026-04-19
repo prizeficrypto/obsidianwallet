@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import ChainIcon, { TokenIcon } from "./ChainIcon";
-import { formatUSD, formatPercent } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useCurrency } from "@/hooks/useCurrency";
 import type { ChainBalance } from "@/hooks/useChainBalances";

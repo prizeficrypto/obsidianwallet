@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, ExternalLink, Clock, Loader2, ArrowLeft, X } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, ExternalLink, Clock, Loader2, ArrowLeft } from "lucide-react";
 import { formatRelativeTime, shortenAddress } from "@/lib/format";
 import { useActivityTxs } from "@/hooks/useActivityTxs";
+import { useTranslation } from "@/hooks/useTranslation";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { Transaction, TxType } from "@/types/transaction";
 
@@ -28,6 +29,7 @@ const TX_ICON_COLOR: Record<TxType, string> = {
 };
 
 function TxRow({ tx }: { tx: Transaction }) {
+  const { t } = useTranslation();
   const isReceive = tx.type === "receive";
   const isSwap    = tx.type === "swap" || tx.type === "bridge";
   const isSend    = tx.type === "send";
@@ -47,6 +49,10 @@ function TxRow({ tx }: { tx: Transaction }) {
   // Amount color
   const amountColor = isReceive ? "#4ade80" : isSwap ? "#60a5fa" : "rgba(255,255,255,0.85)";
 
+  const txLabel = isSwap    ? t("activity.swap")     :
+                  isReceive ? t("activity.received")  :
+                  isSend    ? t("activity.sent")      : t("activity.approved");
+
   return (
     <a
       href={`https://worldchain-mainnet.explorer.alchemy.com/tx/${tx.hash}`}
@@ -65,9 +71,7 @@ function TxRow({ tx }: { tx: Transaction }) {
       {/* Label + subtitle */}
       <div className="flex-1 min-w-0">
         <p className="text-[14px] font-semibold text-white leading-none">
-          {isSwap    ? "Swap"     :
-           isReceive ? "Received" :
-           isSend    ? "Sent"     : "Approved"}
+          {txLabel}
         </p>
         <p
           className="text-[12px] mt-[5px] truncate"
@@ -129,7 +133,7 @@ function Divider() {
   return <div className="mx-4" style={{ height: 1, background: "rgba(255,255,255,0.04)" }} />;
 }
 
-function groupByDate(txs: Transaction[]): { label: string; txs: Transaction[] }[] {
+function groupByDate(txs: Transaction[], t: (key: Parameters<ReturnType<typeof useTranslation>["t"]>[0]) => string): { label: string; txs: Transaction[] }[] {
   const groups = new Map<string, Transaction[]>();
   const now = Date.now();
   const dayMs = 86_400_000;
@@ -137,10 +141,10 @@ function groupByDate(txs: Transaction[]): { label: string; txs: Transaction[] }[
   for (const tx of txs) {
     const diff = now - tx.timestamp;
     let label: string;
-    if (diff < dayMs)          label = "Today";
-    else if (diff < 2 * dayMs) label = "Yesterday";
-    else if (diff < 7 * dayMs) label = "This week";
-    else if (diff < 30 * dayMs) label = "This month";
+    if (diff < dayMs)           label = t("activity.today");
+    else if (diff < 2 * dayMs)  label = t("activity.yesterday");
+    else if (diff < 7 * dayMs)  label = t("activity.thisWeek");
+    else if (diff < 30 * dayMs) label = t("activity.thisMonth");
     else {
       const d = new Date(tx.timestamp);
       label = d.toLocaleString("en-US", { month: "long", year: "numeric" });
@@ -154,7 +158,8 @@ function groupByDate(txs: Transaction[]): { label: string; txs: Transaction[] }[
 
 export default function ActivityScreen({ address, onBack }: ActivityScreenProps) {
   const { data: txs, isLoading } = useActivityTxs(address);
-  const grouped = txs && txs.length > 0 ? groupByDate(txs) : [];
+  const { t } = useTranslation();
+  const grouped = txs && txs.length > 0 ? groupByDate(txs, t) : [];
 
   return (
     <div className="pb-4">
@@ -174,7 +179,7 @@ export default function ActivityScreen({ address, onBack }: ActivityScreenProps)
             className="text-white font-bold"
             style={{ fontSize: 20, letterSpacing: "-0.02em" }}
           >
-            Activity
+            {t("activity.title")}
           </h1>
         </div>
 
@@ -195,13 +200,13 @@ export default function ActivityScreen({ address, onBack }: ActivityScreenProps)
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Loader2 size={20} className="animate-spin" style={{ color: "rgba(255,255,255,0.2)" }} />
-          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.25)" }}>Loading activity…</p>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.25)" }}>{t("activity.loading")}</p>
         </div>
       ) : grouped.length === 0 ? (
         <EmptyState
           icon={<Clock size={22} strokeWidth={1.5} />}
-          title="No transactions yet"
-          description="Your transaction history will appear here"
+          title={t("activity.empty")}
+          description={t("activity.emptyDesc")}
         />
       ) : (
         <div>

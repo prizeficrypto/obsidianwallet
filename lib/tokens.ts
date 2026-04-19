@@ -51,7 +51,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
   {
     address: "0x30974f73A4ac9E606Ed80da928e454977ac486D2",
     symbol: "oXAUt",
-    name: "OpenXAUT",
+    name: "Tether Gold",
     decimals: 6,
     chainId: 480,
     logoURI: "https://assets.coingecko.com/coins/images/10481/small/Tether_Gold.png",

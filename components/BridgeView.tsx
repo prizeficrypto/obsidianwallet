@@ -14,6 +14,7 @@ import {
   applySlippage,
   feeLabel,
   buildApproveCalldata,
+  buildTransferCalldata,
   buildSwapCalldata,
   buildSwapToEthCalldata,
   resolveForUniswap,
@@ -29,6 +30,7 @@ import {
   USDC_E_ADDRESS,
   type UPQuote,
 } from "@/lib/universal";
+import { fetch0xQuote, toZxToken, type ZeroExQuote } from "@/lib/zeroex";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -49,6 +51,11 @@ const WORLD_CHAIN_ID = 480;
 const QUOTE_STALE_MS = 90_000;
 const OUTPUT_DRIFT_THRESHOLD = 0.015; // 1.5%
 const USDC_E_LOWER = USDC_E_ADDRESS.toLowerCase();
+
+// ── Platform fee ──────────────────────────────────────────────────────────────
+const PLATFORM_FEE_BPS = 50n;           // 0.5%
+const PLATFORM_FEE_NUM = 0.005;         // for display math
+const FEE_RECIPIENT = "0xc76a3025fadd524c9af1c3260a6703232e7911a3" as const;
 
 function nativeToken(): TokenState {
   return {
@@ -386,11 +393,13 @@ function RouteDetails({
   toSymbol,
   quoteAgeMs,
   isFetching,
+  feeDisplay,
 }: {
   result: UniswapQuoteResult;
   toSymbol: string;
   quoteAgeMs: number;
   isFetching?: boolean;
+  feeDisplay?: string;
 }) {
   const isStale = quoteAgeMs > QUOTE_STALE_MS;
   const ageSecs = Math.floor(quoteAgeMs / 1000);
@@ -452,6 +461,14 @@ function RouteDetails({
           </span>
           <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>
             0.5%
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.18)" }}>
+            Platform fee
+          </span>
+          <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>
+            0.5%{feeDisplay ? ` · ${feeDisplay}` : ""}
           </span>
         </div>
       </div>
@@ -520,20 +537,30 @@ export default function BridgeView({
   const [upQuote, setUpQuote] = useState<UPQuote | null>(null);
   const [upQuoteLoading, setUpQuoteLoading] = useState(false);
   const [upQuoteError, setUpQuoteError] = useState<string | null>(null);
+  const [upRetryCount, setUpRetryCount] = useState(0);
+
+  // 0x Protocol state
+  const [zeroExQuote, setZeroExQuote] = useState<ZeroExQuote | null>(null);
+  const [zeroExLoading, setZeroExLoading] = useState(false);
 
   // ── Routing logic ─────────────────────────────────────────────────────────
+  // Strategy: always try Uniswap V3 first (UP tokens may have V3 pools).
+  // Fall back to Universal Protocol only when Uniswap finds no route and the
+  // pair is UP-compatible (USDC.e ↔ UP token).
 
-  const useUPRouting = useMemo(() => {
-    return isUPToken(fromToken.address) || isUPToken(toToken.address);
-  }, [fromToken.address, toToken.address]);
-
+  // Whether the current pair can be routed via Universal Protocol
   const upOrderType = useMemo<"BUY" | "SELL" | null>(() => {
-    if (!useUPRouting) return null;
     const fromIsUSDC = fromToken.address.toLowerCase() === USDC_E_LOWER;
     if (fromIsUSDC && isUPToken(toToken.address)) return "BUY";
     if (isUPToken(fromToken.address) && toToken.address.toLowerCase() === USDC_E_LOWER) return "SELL";
     return null;
-  }, [useUPRouting, fromToken.address, toToken.address]);
+  }, [fromToken.address, toToken.address]);
+
+  // True when at least one side is a UP token (affects picker restrictions & messaging)
+  const hasUPToken = useMemo(
+    () => isUPToken(fromToken.address) || isUPToken(toToken.address),
+    [fromToken.address, toToken.address],
+  );
 
   // ── Token filtering ───────────────────────────────────────────────────────
   // Restrict the "to" picker based on what routes exist from "from" token:
@@ -541,10 +568,8 @@ export default function BridgeView({
   //   - UP token as from → only USDC.e
   //   - Any other DEX token as from → only DEX tokens (no u-tokens)
   const allowedToAddresses = useMemo<Set<string> | null>(() => {
-    const from = fromToken.address.toLowerCase();
-    if (from === USDC_E_LOWER) return null; // USDC.e can route to everything
-    if (isUPToken(fromToken.address)) return new Set([USDC_E_LOWER]);
-    return DEX_ADDRESSES; // ETH/WLD/WETH/WBTC/oXAUt → DEX tokens only
+    if (isUPToken(fromToken.address)) return new Set([USDC_E_LOWER]); // UP token → only USDC.e (UP SELL)
+    return null; // all other from-tokens: show full list — Uniswap V3 handles routing
   }, [fromToken.address]);
 
   // Auto-reset toToken if it's no longer valid after fromToken changes
@@ -568,6 +593,28 @@ export default function BridgeView({
     }
   }, [fromBalance]);
 
+  // ── Fee helpers ───────────────────────────────────────────────────────────
+
+  // 99.5% of what the user typed — this is what actually gets swapped
+  const effectiveAmount = useMemo(() => {
+    const n = parseFloat(amount);
+    if (!amount || !Number.isFinite(n) || n <= 0) return "";
+    return (n * (1 - PLATFORM_FEE_NUM)).toString();
+  }, [amount]);
+
+  // Human-readable fee for display: e.g. "0.5000 WLD"
+  const platformFeeDisplay = useMemo(() => {
+    const n = parseFloat(amount);
+    if (!amount || !Number.isFinite(n) || n <= 0) return undefined;
+    const fee = n * PLATFORM_FEE_NUM;
+    const sym = fromToken.address.toLowerCase() === NATIVE_ETH.toLowerCase()
+      ? WORLD_CHAIN.symbol
+      : fromToken.symbol;
+    if (fee < 0.000001) return `<0.000001 ${sym}`;
+    if (fee < 0.001) return `${fee.toFixed(6)} ${sym}`;
+    return `${fee.toFixed(4)} ${sym}`;
+  }, [amount, fromToken]);
+
   // ── Uniswap quote ─────────────────────────────────────────────────────────
 
   const {
@@ -577,12 +624,28 @@ export default function BridgeView({
   } = useUniswapQuote({
     tokenIn: fromToken.address,
     tokenOut: toToken.address,
-    amountIn: amount,
+    amountIn: effectiveAmount,
     decimalsIn: fromToken.decimals,
     decimalsOut: toToken.decimals,
     fromAddress: address,
-    enabled: !useUPRouting,
+    enabled: true, // always try Uniswap V3 — UP tokens may have V3 pools too
   });
+
+  // 0x is second fallback — only used when Uniswap has no route
+  const use0xRouting = useMemo(() => {
+    if (quoteFetching) return false;  // still waiting for Uniswap
+    if (quoteResult) return false;    // Uniswap found a route
+    return !!zeroExQuote;             // 0x has a route
+  }, [quoteFetching, quoteResult, zeroExQuote]);
+
+  // UP is last resort — only when neither Uniswap nor 0x found a route
+  const useUPRouting = useMemo(() => {
+    if (!upOrderType) return false;
+    if (quoteFetching) return false;
+    if (quoteResult) return false;    // Uniswap wins
+    if (zeroExQuote) return false;    // 0x wins
+    return true;                      // fall back to UP
+  }, [upOrderType, quoteFetching, quoteResult, zeroExQuote]);
 
   useEffect(() => {
     if (!dataUpdatedAt) return;
@@ -594,8 +657,10 @@ export default function BridgeView({
 
   // ── Universal Protocol quote ──────────────────────────────────────────────
 
+  // Fetch UP quote whenever the pair is UP-compatible (in parallel with Uniswap).
+  // This way if Uniswap finds no pool the UP quote is already ready.
   useEffect(() => {
-    if (!useUPRouting || !upOrderType || !address || !amount || Number(amount) <= 0) {
+    if (!upOrderType || !address || !amount || Number(amount) <= 0) {
       setUpQuote(null);
       setUpQuoteError(null);
       return;
@@ -611,7 +676,7 @@ export default function BridgeView({
     const controller = new AbortController();
     const timeout = setTimeout(async () => {
       try {
-        const amtWei = parseAmount(amount, fromToken.decimals).toString();
+        const amtWei = parseAmount(effectiveAmount || "0", fromToken.decimals).toString();
         const req =
           upOrderType === "BUY"
             ? { type: "BUY" as const, token: upSymbol, pair_token: "USDC" as const, blockchain: "WORLD" as const, slippage_bips: 50, user_address: address, pair_token_amount: amtWei }
@@ -619,8 +684,11 @@ export default function BridgeView({
         const q = await fetchUPQuote(req);
         if (!controller.signal.aborted) setUpQuote(q);
       } catch (e) {
-        if (!controller.signal.aborted)
-          setUpQuoteError(e instanceof Error ? e.message : "Quote unavailable");
+        if (!controller.signal.aborted) {
+          const msg = e instanceof Error ? e.message : "Quote unavailable";
+          // "rate_limited" is the structured code our proxy returns on 429
+          setUpQuoteError(msg.includes("rate_limited") ? "rate_limited" : msg);
+        }
       } finally {
         if (!controller.signal.aborted) setUpQuoteLoading(false);
       }
@@ -631,7 +699,50 @@ export default function BridgeView({
       clearTimeout(timeout);
       setUpQuoteLoading(false);
     };
-  }, [useUPRouting, upOrderType, address, amount, fromToken, toToken]);
+  }, [upOrderType, address, amount, effectiveAmount, fromToken, toToken, upRetryCount]);
+
+  // ── 0x quote (parallel with Uniswap, used as fallback) ──────────────────────
+  useEffect(() => {
+    if (!amount || Number(amount) <= 0 || !address || !effectiveAmount) {
+      setZeroExQuote(null);
+      return;
+    }
+    // Skip if tokens are identical after resolution
+    const sellAddr = toZxToken(fromToken.address);
+    const buyAddr  = toZxToken(toToken.address);
+    if (sellAddr.toLowerCase() === buyAddr.toLowerCase()) {
+      setZeroExQuote(null);
+      return;
+    }
+
+    setZeroExLoading(true);
+    setZeroExQuote(null);
+
+    const controller = new AbortController();
+    // Small delay so Uniswap (which is synchronous on-chain) gets priority
+    const timeout = setTimeout(async () => {
+      try {
+        const sellAmountWei = parseAmount(effectiveAmount, fromToken.decimals).toString();
+        const q = await fetch0xQuote({
+          sellToken: sellAddr,
+          buyToken: buyAddr,
+          sellAmount: sellAmountWei,
+          takerAddress: address,
+        });
+        if (!controller.signal.aborted) setZeroExQuote(q);
+      } catch {
+        // Silently fall through — 0x failure just means we try UP next
+      } finally {
+        if (!controller.signal.aborted) setZeroExLoading(false);
+      }
+    }, 600);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+      setZeroExLoading(false);
+    };
+  }, [amount, effectiveAmount, fromToken, toToken, address]);
 
   const upToAmount = useMemo(() => {
     if (!upQuote) return "";
@@ -640,7 +751,12 @@ export default function BridgeView({
     return formatAmount(raw, decimals);
   }, [upQuote, upOrderType, toToken.decimals]);
 
-  const toAmount = useUPRouting ? upToAmount : (quoteResult?.amountOutFormatted ?? "");
+  // Output amount: Uniswap > 0x > UP
+  const toAmount = quoteResult
+    ? quoteResult.amountOutFormatted
+    : use0xRouting && zeroExQuote
+    ? formatAmount(zeroExQuote.buyAmount, toToken.decimals)
+    : upToAmount;
 
   const handleFlip = () => {
     setFromToken(toToken);
@@ -648,7 +764,9 @@ export default function BridgeView({
     setAmount("");
   };
 
-  const canExecute = useUPRouting
+  const canExecute = use0xRouting
+    ? !!zeroExQuote && !zeroExLoading && Number(amount) > 0 && !!address
+    : useUPRouting
     ? !!upQuote && !upQuoteLoading && Number(amount) > 0 && !!address && !!upOrderType
     : !!quoteResult && !quoteFetching && Number(amount) > 0 && !!address;
 
@@ -660,11 +778,30 @@ export default function BridgeView({
 
       const isFromNative = fromToken.address.toLowerCase() === NATIVE_ETH.toLowerCase();
       const isToNative = toToken.address.toLowerCase() === NATIVE_ETH.toLowerCase();
-      const amountInWei = parseAmount(amount, fromToken.decimals);
+      const totalAmountWei = parseAmount(amount, fromToken.decimals);
+      const feeAmountWei = totalAmountWei * PLATFORM_FEE_BPS / 10_000n;
+      const amountInWei = totalAmountWei - feeAmountWei;
       const resolvedIn = resolveForUniswap(fromToken.address);
       const amountOutMin = result.amountOutMinimum;
 
       const transactions: Array<{ to: `0x${string}`; data: `0x${string}`; value: string }> = [];
+
+      // ── Platform fee transfer ─────────────────────────────────────
+      if (isFromNative) {
+        // Send ETH fee directly to fee recipient
+        transactions.push({
+          to: FEE_RECIPIENT,
+          data: "0x" as `0x${string}`,
+          value: `0x${feeAmountWei.toString(16)}`,
+        });
+      } else {
+        // Transfer ERC-20 fee to fee recipient
+        transactions.push({
+          to: fromToken.address as `0x${string}`,
+          data: buildTransferCalldata(FEE_RECIPIENT, feeAmountWei),
+          value: "0x0",
+        });
+      }
 
       if (!isFromNative) {
         transactions.push({
@@ -707,9 +844,17 @@ export default function BridgeView({
           chainId: WORLD_CHAIN_ID,
           transactions,
         });
-        const result2 = res as { status?: string; userOpHash?: string };
-        if (result2?.status === "success" || result2?.userOpHash) {
-          setTxHash(result2?.userOpHash ?? "");
+        // MiniKit wraps the result: { commandPayload, finalPayload: { status, transaction_id } }
+        // Fall back to checking top-level fields for forward-compat with older SDK versions.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const r = res as any;
+        const payload = r?.finalPayload ?? r;
+        const isSuccess =
+          payload?.status === "success" || !!payload?.transaction_id || !!payload?.userOpHash;
+        const hash =
+          payload?.transaction_id ?? payload?.userOpHash ?? r?.transaction_id ?? r?.userOpHash ?? "";
+        if (isSuccess) {
+          setTxHash(hash);
           setStep("success");
         } else {
           setErrorMsg("Transaction was not confirmed. Please try again.");
@@ -736,6 +881,95 @@ export default function BridgeView({
     [address, fromToken, toToken, amount],
   );
 
+  // ── execute0x ─────────────────────────────────────────────────────────────
+
+  const execute0x = useCallback(async () => {
+    if (executionInFlight.current || !address) return;
+    executionInFlight.current = true;
+    setIsExecuting(true);
+
+    try {
+      const isFromNative = fromToken.address.toLowerCase() === NATIVE_ETH.toLowerCase();
+      const totalAmountWei = parseAmount(amount, fromToken.decimals);
+      const feeAmountWei   = (totalAmountWei * PLATFORM_FEE_BPS) / 10_000n;
+      const amountInWei    = totalAmountWei - feeAmountWei;
+
+      // Fetch a fresh quote right before signing
+      const freshQuote = await fetch0xQuote({
+        sellToken: toZxToken(fromToken.address),
+        buyToken:  toZxToken(toToken.address),
+        sellAmount: amountInWei.toString(),
+        takerAddress: address,
+      });
+
+      const transactions: Array<{ to: `0x${string}`; data: `0x${string}`; value: string }> = [];
+
+      // 1. Platform fee
+      if (isFromNative) {
+        transactions.push({
+          to:    FEE_RECIPIENT,
+          data:  "0x" as `0x${string}`,
+          value: `0x${feeAmountWei.toString(16)}`,
+        });
+      } else {
+        transactions.push({
+          to:    fromToken.address as `0x${string}`,
+          data:  buildTransferCalldata(FEE_RECIPIENT, feeAmountWei),
+          value: "0x0",
+        });
+      }
+
+      // 2. ERC-20 approval for the 0x allowanceTarget
+      if (!isFromNative && freshQuote.allowanceTarget && freshQuote.allowanceTarget !== "0x0000000000000000000000000000000000000000") {
+        transactions.push({
+          to:    fromToken.address as `0x${string}`,
+          data:  buildApproveCalldata(freshQuote.allowanceTarget, amountInWei),
+          value: "0x0",
+        });
+      }
+
+      // 3. 0x swap call
+      const swapValue = isFromNative
+        ? `0x${amountInWei.toString(16)}`
+        : (freshQuote.value && freshQuote.value !== "0" ? `0x${BigInt(freshQuote.value).toString(16)}` : "0x0");
+
+      transactions.push({
+        to:    freshQuote.to as `0x${string}`,
+        data:  freshQuote.data as `0x${string}`,
+        value: swapValue,
+      });
+
+      const res = await MiniKit.sendTransaction({ chainId: WORLD_CHAIN_ID, transactions });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const r = res as any;
+      const payload = r?.finalPayload ?? r;
+      const isSuccess =
+        payload?.status === "success" || !!payload?.transaction_id || !!payload?.userOpHash;
+      const hash = payload?.transaction_id ?? payload?.userOpHash ?? "";
+
+      if (isSuccess) {
+        setTxHash(hash);
+        setStep("success");
+      } else {
+        setErrorMsg("Transaction was not confirmed. Please try again.");
+        setStep("error");
+      }
+    } catch (e) {
+      const code = (e as { code?: string })?.code ?? "";
+      const msg =
+        code === "user_rejected"
+          ? "Swap cancelled."
+          : code
+          ? `Transaction failed: ${code}`
+          : (e instanceof Error ? e.message : "Transaction failed");
+      setErrorMsg(msg);
+      setStep("error");
+    } finally {
+      setIsExecuting(false);
+      executionInFlight.current = false;
+    }
+  }, [address, fromToken, toToken, amount]);
+
   // ── executeUniversal ──────────────────────────────────────────────────────
 
   const executeUniversal = useCallback(async () => {
@@ -749,8 +983,8 @@ export default function BridgeView({
         upOrderType === "BUY" ? getUPSymbol(toToken.address) : getUPSymbol(fromToken.address);
       if (!upSymbol) throw new Error("Token not supported by Universal Protocol");
 
-      // Step 2: fetch a fresh quote right before signing
-      const amtWei = parseAmount(amount, fromToken.decimals).toString();
+      // Step 2: fetch a fresh quote right before signing (fee-adjusted amount)
+      const amtWei = parseAmount(effectiveAmount || "0", fromToken.decimals).toString();
       let freshQuote;
       try {
         freshQuote = await fetchUPQuote(
@@ -805,7 +1039,7 @@ export default function BridgeView({
       setIsExecuting(false);
       executionInFlight.current = false;
     }
-  }, [address, upOrderType, fromToken, toToken, amount]);
+  }, [address, upOrderType, fromToken, toToken, amount, effectiveAmount]);
 
   // ── execute ───────────────────────────────────────────────────────────────
 
@@ -816,7 +1050,9 @@ export default function BridgeView({
     setIsExecuting(true);
 
     try {
-      const amountInWei = parseAmount(amount, fromToken.decimals);
+      const totalAmountWei = parseAmount(amount, fromToken.decimals);
+      const feeAmountWei = totalAmountWei * PLATFORM_FEE_BPS / 10_000n;
+      const amountInWei = totalAmountWei - feeAmountWei;
       const freshQuote = await getBestQuote(fromToken.address, toToken.address, amountInWei);
 
       if (!freshQuote) {
@@ -939,11 +1175,8 @@ export default function BridgeView({
 
           <button
             onClick={() => { setStep("form"); setTxHash(""); setAmount(""); }}
-            className="w-full py-[15px] rounded-2xl text-[14px] font-semibold text-white active:scale-[0.98] transition-transform"
-            style={{
-              background: "linear-gradient(180deg, #7C6FE8 0%, #5A4FCC 100%)",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
-            }}
+            className="w-full py-[15px] rounded-2xl text-[14px] font-semibold active:scale-[0.98] transition-transform"
+            style={{ background: "white", color: "#111111" }}
           >
             Swap again
           </button>
@@ -1030,13 +1263,10 @@ export default function BridgeView({
         <button
           onClick={() => { setIsExecuting(true); submitWithQuote(pendingFreshQuote); }}
           disabled={isExecuting}
-          className="w-full py-[15px] rounded-2xl text-[14px] font-semibold text-white flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-50 disabled:pointer-events-none"
-          style={{
-            background: "linear-gradient(180deg, #7C6FE8 0%, #5A4FCC 100%)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
-          }}
+          className="w-full py-[15px] rounded-2xl text-[14px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-50 disabled:pointer-events-none"
+          style={{ background: "white", color: "#111111" }}
         >
-          {isExecuting && <Loader2 size={14} className="animate-spin" />}
+          {isExecuting && <Loader2 size={14} className="animate-spin" style={{ color: "#111111" }} />}
           Accept new price and confirm
         </button>
         <button
@@ -1120,14 +1350,28 @@ export default function BridgeView({
 
   const hasAmount = Number(amount) > 0;
 
-  const upUnsupportedPair = useUPRouting && !upOrderType && hasAmount;
-  const isFetchingRoute = useUPRouting
-    ? upQuoteLoading && hasAmount
-    : quoteFetching && hasAmount && !isExecuting;
-  const isNoRoute = useUPRouting
-    ? (!upQuoteLoading && !upQuote && hasAmount && !isExecuting) || upUnsupportedPair
-    : !quoteFetching && !quoteResult && hasAmount && !isExecuting;
-  const isNeutral = isNoRoute || !hasAmount;
+  // UP token involved but the pair isn't compatible with UP (e.g. WLD → uAVAX)
+  // — Uniswap is still tried; this just explains the UP limitation
+  const upUnsupportedPair = hasUPToken && !upOrderType && hasAmount;
+
+  // Show loading while any active route is still fetching
+  const isFetchingRoute = hasAmount && !isExecuting && (
+    quoteFetching ||
+    (!quoteResult && zeroExLoading) ||
+    (!quoteResult && !zeroExQuote && useUPRouting && upQuoteLoading && !upQuote)
+  );
+
+  // True only when all routes genuinely found nothing — API errors are NOT "no route"
+  const isNoRoute = hasAmount && !isExecuting && !isFetchingRoute && (
+    !quoteResult &&
+    !zeroExQuote &&
+    (!upOrderType || (!upQuoteLoading && !upQuote && !upQuoteError))
+  );
+
+  const upIsRateLimited = upQuoteError === "rate_limited";
+  const upHasError = !!upQuoteError && useUPRouting;
+
+  const isNeutral = (isNoRoute && !upHasError) || !hasAmount;
 
   const ctaLabel = isExecuting
     ? "Signing…"
@@ -1137,6 +1381,8 @@ export default function BridgeView({
     ? upUnsupportedPair
       ? "Pair via USDC.e only"
       : "No route available"
+    : upHasError
+    ? "Retry quote"
     : canExecute
     ? `Swap ${fromSymbol} → ${toSymbol}`
     : "Enter amount";
@@ -1216,20 +1462,49 @@ export default function BridgeView({
       />
 
       {/* ── Route details ───────────────────────────────────────────────── */}
-      {!useUPRouting && quoteResult && (
+      {!useUPRouting && !use0xRouting && quoteResult && (
         <RouteDetails
           result={quoteResult}
           toSymbol={toSymbol}
           quoteAgeMs={quoteAgeMs}
           isFetching={quoteFetching}
+          feeDisplay={platformFeeDisplay}
         />
+      )}
+      {use0xRouting && zeroExQuote && (
+        <div
+          className="rounded-xl px-3 py-2.5"
+          style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <div className="flex items-center justify-between mb-[9px]">
+            <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.55)" }}>
+              0x Protocol
+            </span>
+            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.2)" }}>
+              Aggregated liquidity
+            </span>
+          </div>
+          <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} className="mb-[9px]" />
+          <div className="space-y-[7px]">
+            <div className="flex justify-between">
+              <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.18)" }}>Slippage</span>
+              <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>0.5%</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.18)" }}>Platform fee</span>
+              <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>
+                0.5%{platformFeeDisplay ? ` · ${platformFeeDisplay}` : ""}
+              </span>
+            </div>
+          </div>
+        </div>
       )}
       {useUPRouting && upQuote && (
         <div
           className="rounded-xl px-3 py-2.5"
           style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)" }}
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-[9px]">
             <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.55)" }}>
               Universal Protocol
             </span>
@@ -1237,17 +1512,29 @@ export default function BridgeView({
               No gas · Relayer settles
             </span>
           </div>
-          {upQuote.gas_fee_dollars > 0 && (
-            <p className="text-[10px] mt-1" style={{ color: "rgba(255,255,255,0.22)" }}>
-              Network fee: ~${upQuote.gas_fee_dollars.toFixed(4)}
-            </p>
-          )}
+          <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} className="mb-[9px]" />
+          <div className="space-y-[7px]">
+            {upQuote.gas_fee_dollars > 0 && (
+              <div className="flex justify-between">
+                <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.18)" }}>Network fee</span>
+                <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>
+                  ~${upQuote.gas_fee_dollars.toFixed(4)}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.18)" }}>Platform fee</span>
+              <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>
+                0.5%{platformFeeDisplay ? ` · ${platformFeeDisplay}` : ""}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
       {/* ── No route ────────────────────────────────────────────────────── */}
       {isNoRoute && !upUnsupportedPair && <NoRouteSuggestions fromToken={fromToken} />}
-      {upUnsupportedPair && (
+      {isNoRoute && upUnsupportedPair && (
         <div
           className="rounded-xl px-4 py-3.5"
           style={{ background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.06)" }}
@@ -1256,39 +1543,45 @@ export default function BridgeView({
             Swap via USDC.e
           </p>
           <p className="text-[12px] leading-snug" style={{ color: "rgba(255,255,255,0.35)" }}>
-            To swap between two Universal Protocol tokens, first swap to USDC.e, then swap to your target token.
+            To buy this token, swap to USDC.e first, then swap USDC.e for this token.
           </p>
         </div>
       )}
 
       {/* ── UP quote error ───────────────────────────────────────────────── */}
-      {useUPRouting && upQuoteError && hasAmount && (
-        <p className="text-[11px] text-center" style={{ color: "rgba(255,100,100,0.7)" }}>
-          {upQuoteError}
-        </p>
+      {upHasError && hasAmount && (
+        <div
+          className="rounded-xl px-4 py-3"
+          style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.12)" }}
+        >
+          <p className="text-[12px] leading-snug" style={{ color: "rgba(248,113,113,0.8)" }}>
+            {upIsRateLimited
+              ? "Quote service is busy — tap \"Retry quote\" above to try again."
+              : upQuoteError}
+          </p>
+        </div>
       )}
 
       {/* ── CTA ─────────────────────────────────────────────────────────── */}
       <div className="pt-1" />
       <button
-        onClick={useUPRouting ? executeUniversal : execute}
-        disabled={!canExecute || isExecuting || isFetchingRoute}
+        onClick={
+          upHasError
+            ? () => { setUpQuoteError(null); setUpRetryCount(c => c + 1); }
+            : use0xRouting ? execute0x : useUPRouting ? executeUniversal : execute
+        }
+        disabled={(!canExecute && !upHasError) || isExecuting || isFetchingRoute}
         className="w-full py-[15px] rounded-2xl text-[14px] font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98]"
         style={{
-          background: isNeutral
-            ? "#141414"
-            : "linear-gradient(180deg, #7C6FE8 0%, #5A4FCC 100%)",
-          color: isNeutral ? "rgba(255,255,255,0.28)" : "white",
+          background: isNeutral ? "#141414" : "white",
+          color: isNeutral ? "rgba(255,255,255,0.28)" : "#111111",
           opacity: isExecuting ? 1 : isFetchingRoute ? 0.7 : 1,
           border: isNeutral ? "1px solid rgba(255,255,255,0.06)" : "1px solid transparent",
-          boxShadow: isNeutral
-            ? "none"
-            : "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 3px rgba(0,0,0,0.3)",
           letterSpacing: "-0.015em",
         }}
       >
         {(isExecuting || isFetchingRoute) && (
-          <Loader2 size={14} className="animate-spin" style={{ opacity: 0.8 }} />
+          <Loader2 size={14} className="animate-spin" style={{ opacity: 0.8, color: isNeutral ? "white" : "#111111" }} />
         )}
         {ctaLabel}
       </button>
