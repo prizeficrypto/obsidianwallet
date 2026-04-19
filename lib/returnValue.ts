@@ -38,10 +38,16 @@ export interface SinceYouLeftData {
  * Compute the "since you left" summary.
  * Returns null if the snapshot is too old (>7 days), too fresh (<5 min),
  * or if data is insufficient.
+ *
+ * Uses price-based return rather than raw balance comparison so that
+ * sends and receives don't show up as portfolio gains or losses.
+ * The approach: "what would my CURRENT holdings be worth at snapshot prices?"
+ * Comparing that ghost value to the current total gives pure price movement.
  */
 export function computeSinceYouLeft(
   snapshot: PortfolioSnapshot | null,
   currentTotalUSD: number,
+  currentAssets: AssetSnapshot[] = [],
 ): SinceYouLeftData | null {
   if (!snapshot || snapshot.totalUSD < 0.01 || currentTotalUSD < 0.01) {
     return null;
@@ -54,14 +60,43 @@ export function computeSinceYouLeft(
   // Too stale — not meaningful
   if (minutesAgo > 7 * 24 * 60) return null;
 
-  const changeUSD = currentTotalUSD - snapshot.totalUSD;
-  const changePct = (changeUSD / snapshot.totalUSD) * 100;
+  // Build a price lookup from the snapshot
+  const snapshotPrices = new Map<string, number>();
+  for (const a of snapshot.assets) {
+    if (a.priceUSD > 0) snapshotPrices.set(a.id, a.priceUSD);
+  }
 
-  // Skip if change is trivially small
+  // For each currently-held asset, compute what it would be worth at snapshot
+  // prices (using current quantity). This is the "ghost" baseline.
+  let ghostPrevValue = 0;
+  let coveredUSD = 0;
+  for (const a of currentAssets) {
+    const prevPrice = snapshotPrices.get(a.id);
+    if (prevPrice && prevPrice > 0 && a.priceUSD > 0 && a.balanceUSD > 0) {
+      const qty = a.balanceUSD / a.priceUSD; // current quantity
+      ghostPrevValue += qty * prevPrice;
+      coveredUSD += a.balanceUSD;
+    }
+  }
+
+  let changeUSD: number;
+  let changePct: number;
+
+  // Only use price-based return when we have good snapshot coverage (≥50% of
+  // current portfolio value matched to snapshot prices). Otherwise fall back
+  // to raw comparison — e.g. first ever snapshot, or completely new holdings.
+  if (coveredUSD >= currentTotalUSD * 0.5 && ghostPrevValue > 0.01) {
+    changeUSD = currentTotalUSD - ghostPrevValue;
+    changePct = (changeUSD / ghostPrevValue) * 100;
+  } else {
+    changeUSD = currentTotalUSD - snapshot.totalUSD;
+    changePct = (changeUSD / snapshot.totalUSD) * 100;
+  }
+
+  // Skip trivially small changes
   if (Math.abs(changePct) < 0.01 && Math.abs(changeUSD) < 0.10) return null;
 
   const timeLabel = formatTimeAgo(snapshot.timestamp);
-
   return { timeLabel, changeUSD, changePct, minutesAgo };
 }
 

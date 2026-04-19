@@ -80,8 +80,8 @@ export function useReturnValue({
 
   // Compute return-value data
   const sinceYouLeft = useMemo(
-    () => computeSinceYouLeft(lastSnapshot, totalUSD),
-    [lastSnapshot, totalUSD],
+    () => computeSinceYouLeft(lastSnapshot, totalUSD, currentAssets),
+    [lastSnapshot, totalUSD, currentAssets],
   );
 
   const movers = useMemo(

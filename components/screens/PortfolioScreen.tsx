@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { formatUSD, formatScrubTime } from "@/lib/format";
 import {
@@ -11,33 +11,13 @@ import {
 import { useMarketContext } from "@/hooks/useMarketContext";
 import { useMarketNews } from "@/hooks/useMarketNews";
 import { usePortfolioChart, type PortfolioHolding } from "@/hooks/usePortfolioChart";
+import { useSnapshotStore, type AssetSnapshot } from "@/store/snapshotStore";
+import { computeSinceYouLeft } from "@/lib/returnValue";
 import InteractiveLineChart, { type ScrubPoint } from "@/components/InteractiveLineChart";
 import type { ChainBalance } from "@/hooks/useChainBalances";
 import type { WldBalance } from "@/hooks/useWldBalance";
 import type { ERC20Balance } from "@/hooks/useWorldChainTokenBalances";
 
-// ── Portfolio snapshot (since you last opened) ──────────────────────
-
-const SNAPSHOT_KEY = "world-wallet-portfolio-snapshot";
-
-interface PortfolioSnapshot {
-  value: number;
-  timestamp: number;
-}
-
-interface ReturnDelta {
-  usd: number;
-  pct: number;
-  elapsed: string;
-}
-
-function formatElapsedMs(ms: number): string {
-  const h = ms / 3_600_000;
-  if (h < 24) return `${Math.floor(h)}h ago`;
-  const d = ms / 86_400_000;
-  if (d < 14) return `${Math.floor(d)}d ago`;
-  return `${Math.floor(d / 7)}w ago`;
-}
 
 // ── Mover datum ──────────────────────────────────────────────────────
 
@@ -89,26 +69,49 @@ export default function PortfolioScreen({
   const [chartDays, setChartDays] = useState<Days>(1);
   const [scrubPoint, setScrubPoint] = useState<ScrubPoint | null>(null);
   const [selectedSlice, setSelectedSlice] = useState<string | null>(null);
-  const [returnDelta, setReturnDelta] = useState<ReturnDelta | null>(null);
 
-  // "Since you last opened" — read stored snapshot, then update it
-  useEffect(() => {
-    if (isLoading || totalUSD < 0.01) return;
-    try {
-      const raw = localStorage.getItem(SNAPSHOT_KEY);
-      if (raw) {
-        const prev: PortfolioSnapshot = JSON.parse(raw);
-        const ms = Date.now() - prev.timestamp;
-        if (ms >= 3_600_000 && prev.value > 0.01) {
-          const usd = totalUSD - prev.value;
-          const pct = (usd / prev.value) * 100;
-          setReturnDelta({ usd, pct, elapsed: formatElapsedMs(ms) });
-        }
+  // "Since you last opened" — use shared snapshotStore so we get the same
+  // price-based return calculation (not raw balance diff) as the home screen.
+  const { lastSnapshot } = useSnapshotStore();
+
+  const currentAssetsForSnapshot: AssetSnapshot[] = useMemo(() => {
+    const assets: AssetSnapshot[] = [];
+    if (wldBalance && wldBalance.usd > 0.01) {
+      const amt = parseFloat(wldBalance.formatted);
+      assets.push({
+        id: "worldcoin-wld",
+        symbol: "WLD",
+        priceUSD: amt > 0 ? wldBalance.usd / amt : 0,
+        balanceUSD: wldBalance.usd,
+      });
+    }
+    for (const b of balances ?? []) {
+      if (b.usdValue > 0.01) {
+        assets.push({
+          id: b.chain.id,
+          symbol: b.chain.symbol,
+          priceUSD: b.nativeBalance > 0 ? b.usdValue / b.nativeBalance : 0,
+          balanceUSD: b.usdValue,
+        });
       }
-      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({ value: totalUSD, timestamp: Date.now() }));
-    } catch {}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading]);
+    }
+    for (const t of tokenBalances ?? []) {
+      if (t.balanceUSD > 0.01 && t.coingeckoId) {
+        assets.push({
+          id: t.coingeckoId,
+          symbol: t.symbol,
+          priceUSD: t.balance > 0 ? t.balanceUSD / t.balance : 0,
+          balanceUSD: t.balanceUSD,
+        });
+      }
+    }
+    return assets;
+  }, [wldBalance, balances, tokenBalances]);
+
+  const returnDelta = useMemo(() => {
+    if (isLoading) return null;
+    return computeSinceYouLeft(lastSnapshot, totalUSD, currentAssetsForSnapshot);
+  }, [isLoading, lastSnapshot, totalUSD, currentAssetsForSnapshot]);
 
   const { data: market } = useMarketContext();
   const { data: news } = useMarketNews();
@@ -275,7 +278,7 @@ export default function PortfolioScreen({
               </p>
             ) : null}
 
-            {/* Since you last opened */}
+            {/* Since you last opened — price-based, ignores sends/receives */}
             {!isScrubbing && returnDelta && (
               <p className="mt-2 flex items-center gap-1.5">
                 <span
@@ -283,11 +286,11 @@ export default function PortfolioScreen({
                   style={{
                     fontSize: 12,
                     fontWeight: 500,
-                    color: returnDelta.usd >= 0 ? "rgba(74,222,128,0.6)" : "rgba(248,113,113,0.6)",
+                    color: returnDelta.changeUSD >= 0 ? "rgba(74,222,128,0.6)" : "rgba(248,113,113,0.6)",
                   }}
                 >
-                  {returnDelta.usd >= 0 ? "+" : "\u2013"}
-                  {formatUSD(Math.abs(returnDelta.usd))} ({returnDelta.pct >= 0 ? "+" : ""}{returnDelta.pct.toFixed(1)}%)
+                  {returnDelta.changeUSD >= 0 ? "+" : "\u2013"}
+                  {formatUSD(Math.abs(returnDelta.changeUSD))} ({returnDelta.changePct >= 0 ? "+" : ""}{returnDelta.changePct.toFixed(1)}%)
                 </span>
                 <span
                   style={{
@@ -296,7 +299,7 @@ export default function PortfolioScreen({
                     color: "rgba(255,255,255,0.18)",
                   }}
                 >
-                  since {returnDelta.elapsed}
+                  {returnDelta.timeLabel.toLowerCase()}
                 </span>
               </p>
             )}
