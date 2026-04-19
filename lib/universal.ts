@@ -73,12 +73,18 @@ export interface UPQuoteRequest {
   token_amount?: string;       // SELL: u-token in 18-decimal units
 }
 
-// ── API calls (via server-side proxy to avoid CORS / bot-detection) ──────────
+// ── API calls ─────────────────────────────────────────────────────────────────
+//
+// Quote is called directly from the browser (client-side) so that the World App
+// WebView handles the Vercel security checkpoint on app.universal.xyz.
+// Server-side Node.js requests are blocked by that checkpoint; browser requests are not.
+// Requires https://app.universal.xyz to be listed in Additional Domains in the
+// World Developer Portal so the WebView can fetch it.
 
 export async function fetchUPQuote(req: UPQuoteRequest): Promise<UPQuote> {
-  const res = await fetch("/api/universal/quote", {
+  const res = await fetch("https://app.universal.xyz/api/v1/quote", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(req),
   });
   if (!res.ok) {
@@ -92,9 +98,9 @@ export async function submitUPOrder(
   quote: UPQuote,
   signature: string
 ): Promise<{ transaction_hash: string }> {
-  const res = await fetch("/api/universal/order", {
+  const res = await fetch("https://app.universal.xyz/api/v1/order", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ ...quote, signature }),
   });
   if (!res.ok) {
