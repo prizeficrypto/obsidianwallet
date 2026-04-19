@@ -73,12 +73,14 @@ export interface UPQuoteRequest {
   token_amount?: string;       // SELL: u-token in 18-decimal units
 }
 
-// ── API calls ─────────────────────────────────────────────────────────────────
+// ── API calls (called client-side to bypass Vercel bot-detection on server) ──
+
+const UP_API = "https://www.universal.xyz/api/v1";
 
 export async function fetchUPQuote(req: UPQuoteRequest): Promise<UPQuote> {
-  const res = await fetch("/api/universal/quote", {
+  const res = await fetch(`${UP_API}/quote`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(req),
   });
   if (!res.ok) {
@@ -92,9 +94,9 @@ export async function submitUPOrder(
   quote: UPQuote,
   signature: string
 ): Promise<{ transaction_hash: string }> {
-  const res = await fetch("/api/universal/order", {
+  const res = await fetch(`${UP_API}/order`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ ...quote, signature }),
   });
   if (!res.ok) {
