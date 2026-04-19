@@ -738,41 +738,61 @@ export default function BridgeView({
     setIsExecuting(true);
 
     try {
+      // Step 1: resolve UP symbol
       const upSymbol =
         upOrderType === "BUY" ? getUPSymbol(toToken.address) : getUPSymbol(fromToken.address);
       if (!upSymbol) throw new Error("Token not supported by Universal Protocol");
 
+      // Step 2: fetch a fresh quote right before signing
       const amtWei = parseAmount(amount, fromToken.decimals).toString();
-      const freshQuote = await fetchUPQuote(
-        upOrderType === "BUY"
-          ? { type: "BUY", token: upSymbol, pair_token: "USDC", blockchain: "WORLD", slippage_bips: 20, user_address: address, pair_token_amount: amtWei }
-          : { type: "SELL", token: upSymbol, pair_token: "USDC", blockchain: "WORLD", slippage_bips: 20, user_address: address, token_amount: amtWei }
-      );
+      let freshQuote;
+      try {
+        freshQuote = await fetchUPQuote(
+          upOrderType === "BUY"
+            ? { type: "BUY", token: upSymbol, pair_token: "USDC", blockchain: "WORLD", slippage_bips: 50, user_address: address, pair_token_amount: amtWei }
+            : { type: "SELL", token: upSymbol, pair_token: "USDC", blockchain: "WORLD", slippage_bips: 50, user_address: address, token_amount: amtWei }
+        );
+      } catch (e) {
+        throw new Error(`Quote failed: ${e instanceof Error ? e.message : "unknown error"}`);
+      }
 
+      // Step 3: build EIP-712 typed data via universal-sdk
       const { generateTypedData } = await import("universal-sdk");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { typedData } = await generateTypedData(freshQuote as any);
 
-      const signResult = await MiniKit.signTypedData({
-        ...typedData,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        types: typedData.types as any,
-        chainId: 480,
-      });
+      // Step 4: ask user to sign (no gas) via MiniKit
+      let signResult;
+      try {
+        signResult = await MiniKit.signTypedData({
+          ...typedData,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          types: typedData.types as any,
+          chainId: 480,
+        });
+      } catch (e) {
+        const code = (e as { code?: string })?.code ?? "";
+        if (code === "user_rejected") throw new Error("user_rejected");
+        throw new Error(`Signing failed: ${e instanceof Error ? e.message : code || "unknown error"}`);
+      }
 
+      // Step 5: submit signed order to relayer
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const signature = (signResult as any)?.data?.signature ?? (signResult as any)?.signature ?? "";
-      const { transaction_hash } = await submitUPOrder(freshQuote, signature);
+      if (!signature) throw new Error("No signature returned from World App — try again.");
+
+      let transaction_hash: string;
+      try {
+        ({ transaction_hash } = await submitUPOrder(freshQuote, signature));
+      } catch (e) {
+        throw new Error(`Order submission failed: ${e instanceof Error ? e.message : "unknown error"}`);
+      }
+
       setTxHash(transaction_hash ?? "");
       setStep("success");
     } catch (e) {
-      const code = (e as { code?: string })?.code ?? "";
-      const msg =
-        code === "user_rejected"
-          ? "Swap cancelled."
-          : e instanceof Error
-          ? e.message
-          : "Swap failed";
+      const raw = e instanceof Error ? e.message : "Swap failed";
+      const msg = raw === "user_rejected" ? "Swap cancelled." : raw;
       setErrorMsg(msg);
       setStep("error");
     } finally {
