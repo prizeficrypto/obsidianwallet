@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslation } from "@/hooks/useTranslation";
+
 interface WelcomeScreenProps {
   onConnect: () => void;
   isLoading: boolean;
@@ -9,8 +11,6 @@ interface WelcomeScreenProps {
 }
 
 // ── Obsidian mark ─────────────────────────────────────────────────────────────
-// Two stacked diamond facets — upper bright, lower dim —
-// referencing the light-catching planes of volcanic glass.
 function ObsidianMark({ size = 1 }: { size?: number }) {
   const w = Math.round(24 * size);
   const h = Math.round(32 * size);
@@ -55,15 +55,15 @@ function EmptyWalletCard({
       <div className="space-y-2.5">
         <button
           onClick={onDeposit}
-          className="w-full py-3.5 rounded-2xl text-sm font-semibold text-white transition-all active:scale-[0.98]"
-          style={{ background: "#6C5CE7" }}
+          className="w-full py-3.5 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98]"
+          style={{ background: "white", color: "#111111" }}
         >
           Buy crypto with cash
         </button>
         <button
           onClick={onTransfer}
-          className="w-full py-3.5 rounded-2xl text-sm font-semibold text-white/70 transition-all active:scale-[0.98]"
-          style={{ background: "#222222" }}
+          className="w-full py-3.5 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98]"
+          style={{ background: "#222222", color: "rgba(255,255,255,0.7)" }}
         >
           Transfer crypto
         </button>
@@ -83,6 +83,8 @@ function ConnectCard({
   isLoading: boolean;
   isInWorldApp: boolean;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div
       className="flex flex-col min-h-screen select-none"
@@ -108,7 +110,6 @@ function ConnectCard({
           Obsidian
         </h1>
 
-        {/* Separator — makes the space below the name feel chosen */}
         <div
           style={{
             width: 24,
@@ -126,7 +127,7 @@ function ConnectCard({
             letterSpacing: "-0.005em",
           }}
         >
-          Your World Chain portfolio
+          {t("welcome.tagline")}
         </p>
       </div>
 
@@ -141,27 +142,31 @@ function ConnectCard({
             marginBottom: 12,
           }}
         >
-          Non-custodial · Secured by World ID
+          {t("welcome.securityNote")}
         </p>
 
         <button
           onClick={onConnect}
           disabled={isLoading}
-          className="w-full py-[17px] rounded-2xl font-semibold text-white text-[15px] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-          style={{ background: "#6C5CE7", letterSpacing: "-0.015em" }}
+          className="w-full py-[17px] rounded-2xl font-semibold text-[15px] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+          style={{
+            background: "white",
+            color: "#111111",
+            letterSpacing: "-0.015em",
+          }}
         >
           {isLoading ? (
             <>
               <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="3" opacity="0.25" />
-                <path d="M12 2a10 10 0 0110 10" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="10" stroke="#111111" strokeWidth="3" opacity="0.25" />
+                <path d="M12 2a10 10 0 0110 10" stroke="#111111" strokeWidth="3" strokeLinecap="round" />
               </svg>
-              Connecting…
+              {t("welcome.connecting")}
             </>
           ) : isInWorldApp ? (
-            "Continue with World ID"
+            t("welcome.connect")
           ) : (
-            "Connect wallet"
+            t("welcome.connectWeb")
           )}
         </button>
 
@@ -170,7 +175,7 @@ function ConnectCard({
             className="text-center"
             style={{ fontSize: 11, color: "rgba(255,255,255,0.14)", marginTop: 12 }}
           >
-            Open in World App for the full experience
+            {t("welcome.openInWorldApp")}
           </p>
         )}
       </div>

@@ -1,64 +1,86 @@
 "use client";
 
 import { Home, Clock, TrendingUp, PieChart } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface BottomNavProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
 
-const NAV_ITEMS = [
-  { id: "home",      icon: Home,       label: "Home" },
-  { id: "activity",  icon: Clock,      label: "Activity" },
-  { id: "swap",      icon: TrendingUp, label: "Invest" },
-  { id: "portfolio", icon: PieChart,   label: "Portfolio" },
-];
-
 export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
+  const { t } = useTranslation();
+
+  const NAV_ITEMS = [
+    { id: "home",      icon: Home,       label: t("nav.home")      },
+    { id: "activity",  icon: Clock,      label: t("nav.activity")  },
+    { id: "swap",      icon: TrendingUp, label: t("nav.invest")    },
+    { id: "portfolio", icon: PieChart,   label: t("nav.portfolio") },
+  ];
+
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 max-w-[430px] mx-auto"
+      className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none"
       style={{
-        background: "rgba(11,11,11,0.98)",
-        backdropFilter: "blur(24px)",
-        WebkitBackdropFilter: "blur(24px)",
-        borderTop: "1px solid rgba(255,255,255,0.07)",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)",
+        paddingLeft: 16,
+        paddingRight: 16,
+        maxWidth: 430,
+        margin: "0 auto",
+        left: 0,
+        right: 0,
       }}
     >
-      <div className="flex items-stretch justify-around px-1 pt-2 pb-2">
+      <div
+        className="pointer-events-auto flex items-center w-full"
+        style={{
+          background: "rgba(14,14,18,0.82)",
+          backdropFilter: "blur(40px)",
+          WebkitBackdropFilter: "blur(40px)",
+          borderRadius: 32,
+          border: "1px solid rgba(255,255,255,0.09)",
+          boxShadow:
+            "0 8px 32px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.07)",
+          padding: "5px 5px",
+          gap: 2,
+        }}
+      >
         {NAV_ITEMS.map(({ id, icon: Icon, label }) => {
           const active = activeTab === id;
           return (
             <button
               key={id}
               onClick={() => onTabChange(id)}
-              className="flex flex-col items-center gap-[5px] flex-1 pt-1 pb-1 active:scale-90 transition-all duration-100 relative"
+              className="flex-1 flex flex-col items-center gap-[4px] active:scale-90 transition-all duration-150 relative"
+              style={{
+                padding: "8px 4px",
+                borderRadius: 26,
+                background: active
+                  ? "rgba(255,255,255,0.11)"
+                  : "transparent",
+                transition: "background 0.2s ease",
+              }}
             >
-              {/* Active indicator bar */}
-              <div
-                className="absolute top-0 left-1/2 -translate-x-1/2 rounded-full transition-all duration-150"
-                style={{
-                  width: active ? 16 : 0,
-                  height: 2,
-                  background: active ? "rgba(255,255,255,0.5)" : "transparent",
-                }}
-              />
-
               <Icon
                 size={18}
                 strokeWidth={active ? 2 : 1.5}
                 style={{
-                  color: active ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.28)",
-                  marginTop: 4,
+                  color: active
+                    ? "rgba(255,255,255,0.92)"
+                    : "rgba(255,255,255,0.28)",
+                  transition: "color 0.2s ease",
                 }}
               />
               <span
                 style={{
                   fontSize: 10,
                   fontWeight: active ? 600 : 400,
-                  letterSpacing: "0.02em",
-                  color: active ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.22)",
+                  letterSpacing: "0.01em",
+                  color: active
+                    ? "rgba(255,255,255,0.7)"
+                    : "rgba(255,255,255,0.22)",
+                  transition: "color 0.2s ease",
+                  lineHeight: 1,
                 }}
               >
                 {label}

@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowUpRight, ArrowDownLeft, TrendingUp } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface QuickActionsProps {
   onSend: () => void;
@@ -8,13 +9,15 @@ interface QuickActionsProps {
   onSwap: () => void;
 }
 
-const ACTIONS = [
-  { label: "Send",    icon: ArrowUpRight,  key: "send",    primary: true  },
-  { label: "Receive", icon: ArrowDownLeft, key: "receive", primary: true  },
-  { label: "Buy",     icon: TrendingUp,    key: "buy",     primary: false },
-] as const;
-
 export default function QuickActions({ onSend, onReceive, onSwap }: QuickActionsProps) {
+  const { t } = useTranslation();
+
+  const ACTIONS = [
+    { label: t("actions.send"),    icon: ArrowUpRight,  key: "send",    primary: true  },
+    { label: t("actions.receive"), icon: ArrowDownLeft, key: "receive", primary: true  },
+    { label: t("actions.buy"),     icon: TrendingUp,    key: "buy",     primary: false },
+  ] as const;
+
   const handlers: Record<string, () => void> = {
     send: onSend,
     receive: onReceive,
