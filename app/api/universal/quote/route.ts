@@ -20,6 +20,12 @@ export async function POST(request: Request) {
       headers: BROWSER_HEADERS,
       body: JSON.stringify(body),
     });
+    if (res.status === 429) {
+      return NextResponse.json(
+        { error: "Rate limited – please wait a moment and try again." },
+        { status: 429 }
+      );
+    }
     const text = await res.text();
     let data: unknown;
     try {

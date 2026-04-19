@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { ArrowUpDown, ChevronDown, AlertCircle, Check, X, Loader2 } from "lucide-react";
 import { MiniKit } from "@worldcoin/minikit-js";
 import { CHAINS } from "@/lib/chains";
@@ -147,6 +148,106 @@ function TokenBlock({
     );
   }
 
+  const pickerPortal =
+    isOpen && typeof document !== "undefined"
+      ? createPortal(
+          <>
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 z-[9998]"
+              style={{ background: "rgba(0,0,0,0.65)" }}
+              onClick={() => onOpenChange(false)}
+            />
+
+            {/* Sheet */}
+            <div
+              className="fixed bottom-0 left-0 right-0 z-[9999] rounded-t-2xl overflow-hidden"
+              style={{
+                maxWidth: 430,
+                margin: "0 auto",
+                background: "#181818",
+                border: "1px solid rgba(255,255,255,0.07)",
+                borderBottom: "none",
+                maxHeight: "72vh",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              {/* Sheet header */}
+              <div
+                className="flex items-center justify-between px-4 shrink-0"
+                style={{
+                  paddingTop: 16,
+                  paddingBottom: 14,
+                  borderBottom: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <p className="text-[16px] font-bold text-white">{pickerLabel}</p>
+                <button
+                  onClick={() => onOpenChange(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center active:bg-white/10"
+                  style={{ background: "rgba(255,255,255,0.06)" }}
+                >
+                  <X size={15} style={{ color: "rgba(255,255,255,0.6)" }} />
+                </button>
+              </div>
+
+              {/* Scrollable token list */}
+              <div className="overflow-y-auto flex-1">
+                {/* Native ETH */}
+                {showNative && (
+                  <button
+                    onClick={() => { onTokenChange(nativeToken()); onOpenChange(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 active:bg-white/5 transition-colors"
+                  >
+                    <ChainIcon chainId="world-chain" size={32} />
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="text-[14px] font-semibold text-white">{WORLD_CHAIN.symbol}</p>
+                      <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.3)" }}>
+                        World Chain · Native
+                      </p>
+                    </div>
+                    {isNative && <Check size={13} className="text-purple-400 shrink-0" />}
+                  </button>
+                )}
+
+                {/* Held tokens section */}
+                {held.length > 0 && (
+                  <>
+                    <div className="mx-4 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                    <p
+                      className="px-4 pt-2.5 pb-1"
+                      style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}
+                    >
+                      Your tokens
+                    </p>
+                    {held.map((t) => <TokenRow key={t.address} t={t} />)}
+                  </>
+                )}
+
+                {/* All other tokens */}
+                {others.length > 0 && (
+                  <>
+                    <div className="mx-4 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                    <p
+                      className="px-4 pt-2.5 pb-1"
+                      style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}
+                    >
+                      {held.length > 0 ? "All tokens" : "Tokens"}
+                    </p>
+                    {others.map((t) => <TokenRow key={t.address} t={t} />)}
+                  </>
+                )}
+
+                {/* Safe scroll padding */}
+                <div style={{ height: 24 }} />
+              </div>
+            </div>
+          </>,
+          document.body
+        )
+      : null;
+
   return (
     <>
       <div
@@ -273,102 +374,7 @@ function TokenBlock({
         </div>
       </div>
 
-      {/* ── Token picker — fixed bottom sheet ─────────────────────────────── */}
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-40"
-            style={{ background: "rgba(0,0,0,0.65)" }}
-            onClick={() => onOpenChange(false)}
-          />
-
-          {/* Sheet */}
-          <div
-            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl overflow-hidden"
-            style={{
-              maxWidth: 430,
-              margin: "0 auto",
-              background: "#181818",
-              border: "1px solid rgba(255,255,255,0.07)",
-              borderBottom: "none",
-              maxHeight: "72vh",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            {/* Sheet header */}
-            <div
-              className="flex items-center justify-between px-4 shrink-0"
-              style={{
-                paddingTop: 16,
-                paddingBottom: 14,
-                borderBottom: "1px solid rgba(255,255,255,0.06)",
-              }}
-            >
-              <p className="text-[16px] font-bold text-white">{pickerLabel}</p>
-              <button
-                onClick={() => onOpenChange(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center active:bg-white/10"
-                style={{ background: "rgba(255,255,255,0.06)" }}
-              >
-                <X size={15} style={{ color: "rgba(255,255,255,0.6)" }} />
-              </button>
-            </div>
-
-            {/* Scrollable token list */}
-            <div className="overflow-y-auto flex-1">
-              {/* Native ETH */}
-              {showNative && (
-                <button
-                  onClick={() => { onTokenChange(nativeToken()); onOpenChange(false); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 active:bg-white/5 transition-colors"
-                >
-                  <ChainIcon chainId="world-chain" size={32} />
-                  <div className="flex-1 text-left min-w-0">
-                    <p className="text-[14px] font-semibold text-white">{WORLD_CHAIN.symbol}</p>
-                    <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.3)" }}>
-                      World Chain · Native
-                    </p>
-                  </div>
-                  {isNative && <Check size={13} className="text-purple-400 shrink-0" />}
-                </button>
-              )}
-
-              {/* Held tokens section */}
-              {held.length > 0 && (
-                <>
-                  <div className="mx-4 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-                  <p
-                    className="px-4 pt-2.5 pb-1"
-                    style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}
-                  >
-                    Your tokens
-                  </p>
-                  {held.map((t) => <TokenRow key={t.address} t={t} />)}
-                </>
-              )}
-
-              {/* All other tokens */}
-              {others.length > 0 && (
-                <>
-                  <div className="mx-4 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-                  <p
-                    className="px-4 pt-2.5 pb-1"
-                    style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}
-                  >
-                    {held.length > 0 ? "All tokens" : "Tokens"}
-                  </p>
-                  {others.map((t) => <TokenRow key={t.address} t={t} />)}
-                </>
-              )}
-
-              {/* Safe scroll padding */}
-              <div style={{ height: 24 }} />
-            </div>
-          </div>
-        </>
-      )}
+      {pickerPortal}
     </>
   );
 }
@@ -618,7 +624,7 @@ export default function BridgeView({
       } finally {
         if (!controller.signal.aborted) setUpQuoteLoading(false);
       }
-    }, 600);
+    }, 1200);
 
     return () => {
       controller.abort();
