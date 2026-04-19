@@ -68,6 +68,14 @@ export default function WalletApp() {
     for (const t of tokenBalances ?? []) set.add(t.contractAddress.toLowerCase());
     return set;
   }, [wldBalance, tokenBalances]);
+
+  // Balance map for swap UI: address.toLowerCase() → human-readable balance
+  const balanceMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (wldBalance?.raw) map["0x2cfc85d8e48f8eab294be644d9e25c3030863003"] = Number(wldBalance.raw) / 1e18;
+    for (const t of tokenBalances ?? []) map[t.contractAddress.toLowerCase()] = t.balance;
+    return map;
+  }, [wldBalance, tokenBalances]);
   const isBalanceLoading = balancesLoading || !prices;
   const isEmpty = !isBalanceLoading && totalUSD === 0;
 
@@ -204,7 +212,7 @@ export default function WalletApp() {
             )}
 
             {navTab === "swap" && (
-              <BridgeView address={wallet.address} heldAddresses={heldAddresses} />
+              <BridgeView address={wallet.address} heldAddresses={heldAddresses} balanceMap={balanceMap} />
             )}
           </main>
 

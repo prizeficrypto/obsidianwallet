@@ -47,6 +47,7 @@ const WORLD_CHAIN = CHAINS.find((c) => c.id === "world-chain")!;
 const WORLD_CHAIN_ID = 480;
 const QUOTE_STALE_MS = 90_000;
 const OUTPUT_DRIFT_THRESHOLD = 0.015; // 1.5%
+const USDC_E_LOWER = USDC_E_ADDRESS.toLowerCase();
 
 function nativeToken(): TokenState {
   return {
@@ -61,6 +62,17 @@ function usdcToken(): TokenState {
   return { address: t.address, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI, name: t.name };
 }
 
+// All DEX-routable token addresses (lowercase) — anything NOT in UP_MAP + native ETH
+function buildDexAddresses(): Set<string> {
+  const set = new Set<string>();
+  set.add(NATIVE_ETH.toLowerCase());
+  WORLD_CHAIN_TOKENS.forEach((t) => {
+    if (!isUPToken(t.address)) set.add(t.address.toLowerCase());
+  });
+  return set;
+}
+const DEX_ADDRESSES = buildDexAddresses();
+
 // ── TokenBlock ────────────────────────────────────────────────────────────────
 
 function TokenBlock({
@@ -72,6 +84,11 @@ function TokenBlock({
   isLoading,
   label,
   heldAddresses,
+  allowedAddresses,
+  balance,
+  onMax,
+  isOpen,
+  onOpenChange,
 }: {
   token: TokenState;
   onTokenChange: (t: TokenState) => void;
@@ -81,81 +98,143 @@ function TokenBlock({
   isLoading?: boolean;
   label?: string;
   heldAddresses?: Set<string>;
+  /** null = all tokens allowed; Set = only show these addresses */
+  allowedAddresses?: Set<string> | null;
+  balance?: number;
+  onMax?: () => void;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const isNative = token.address.toLowerCase() === NATIVE_ETH.toLowerCase();
   const displaySymbol = isNative ? WORLD_CHAIN.symbol : token.symbol;
   const displaySubtext = isNative ? "World Chain · Native" : (token.name ?? token.symbol);
 
-  return (
-    <div
-      className="rounded-2xl"
-      style={{
-        background: isReadOnly
-          ? "#0d0d0d"
-          : "linear-gradient(160deg, #18181b 0%, #111113 100%)",
-        border: isReadOnly
-          ? "1px solid rgba(255,255,255,0.04)"
-          : "1px solid rgba(255,255,255,0.10)",
-        boxShadow: isReadOnly
-          ? "none"
-          : "0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03)",
-      }}
-    >
-      <div className="px-4 pt-3.5 pb-4">
-        {label && (
-          <p
-            className="mb-2.5"
-            style={{
-              fontSize: 11,
-              fontWeight: 400,
-              color: isReadOnly ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.28)",
-            }}
-          >
-            {label}
-          </p>
-        )}
+  // Filter token list
+  const showNative = !allowedAddresses || allowedAddresses.has(NATIVE_ETH.toLowerCase());
+  const filteredTokens = allowedAddresses
+    ? WORLD_CHAIN_TOKENS.filter((t) => allowedAddresses.has(t.address.toLowerCase()))
+    : WORLD_CHAIN_TOKENS;
 
-        <div className="flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            {isLoading ? (
-              <div className="flex items-center gap-2">
-                <Loader2 size={13} className="animate-spin" style={{ color: "rgba(255,255,255,0.2)" }} />
-                <span style={{ fontSize: 15, fontWeight: 400, color: "rgba(255,255,255,0.2)" }}>
-                  Getting quote…
-                </span>
-              </div>
-            ) : isReadOnly ? (
+  const held = heldAddresses && heldAddresses.size > 0
+    ? filteredTokens.filter((t) => heldAddresses.has(t.address.toLowerCase()))
+    : [];
+  const others = held.length > 0
+    ? filteredTokens.filter((t) => !heldAddresses!.has(t.address.toLowerCase()))
+    : filteredTokens;
+
+  const pickerLabel = label === "You pay" ? "Spend" : "Receive";
+
+  function TokenRow({ t }: { t: typeof WORLD_CHAIN_TOKENS[number] }) {
+    const isSelected = !isNative && t.address.toLowerCase() === token.address.toLowerCase();
+    return (
+      <button
+        key={t.address}
+        onClick={() => {
+          onTokenChange({ address: t.address, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI, name: t.name });
+          onOpenChange(false);
+        }}
+        className="w-full flex items-center gap-3 px-4 py-3 active:bg-white/5 transition-colors"
+      >
+        <TokenIcon logoURI={t.logoURI} symbol={t.symbol} size={32} />
+        <div className="flex-1 text-left min-w-0">
+          <p className="text-[14px] font-semibold text-white">{t.symbol}</p>
+          <p className="text-[11px] truncate mt-0.5" style={{ color: "rgba(255,255,255,0.3)" }}>
+            {t.name}
+          </p>
+        </div>
+        {isSelected && <Check size={13} className="text-purple-400 shrink-0" />}
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <div
+        className="rounded-2xl"
+        style={{
+          background: isReadOnly
+            ? "#0d0d0d"
+            : "linear-gradient(160deg, #18181b 0%, #111113 100%)",
+          border: isReadOnly
+            ? "1px solid rgba(255,255,255,0.04)"
+            : "1px solid rgba(255,255,255,0.10)",
+          boxShadow: isReadOnly
+            ? "none"
+            : "0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03)",
+        }}
+      >
+        <div className="px-4 pt-3.5 pb-4">
+          {/* Label + Balance row */}
+          <div className="flex items-center justify-between mb-2.5">
+            {label && (
               <p
-                key={amount}
-                className="tabular-nums leading-none value-update"
                 style={{
-                  fontSize: 34,
-                  fontWeight: 700,
-                  letterSpacing: "-0.025em",
-                  color: amount && amount !== "0" ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.1)",
+                  fontSize: 11,
+                  fontWeight: 400,
+                  color: isReadOnly ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.28)",
                 }}
               >
-                {amount || "0"}
+                {label}
               </p>
-            ) : (
-              <input
-                type="number"
-                inputMode="decimal"
-                placeholder="0"
-                value={amount}
-                onChange={(e) => onAmountChange?.(e.target.value)}
-                className="w-full bg-transparent text-[34px] font-bold text-white placeholder:text-white/[0.1] outline-none tabular-nums leading-none"
-                style={{ letterSpacing: "-0.025em" }}
-                min="0"
-              />
+            )}
+            {!isReadOnly && balance !== undefined && (
+              <div className="flex items-center gap-2">
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>
+                  {balance.toLocaleString(undefined, { maximumFractionDigits: 6 })} {displaySymbol}
+                </span>
+                {onMax && (
+                  <button
+                    onClick={onMax}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform"
+                    style={{ background: "rgba(124,111,232,0.18)", color: "rgba(155,140,255,0.95)" }}
+                  >
+                    Max
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
-          <div className="relative shrink-0">
+          {/* Amount + Token picker row */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 size={13} className="animate-spin" style={{ color: "rgba(255,255,255,0.2)" }} />
+                  <span style={{ fontSize: 15, fontWeight: 400, color: "rgba(255,255,255,0.2)" }}>
+                    Getting quote…
+                  </span>
+                </div>
+              ) : isReadOnly ? (
+                <p
+                  key={amount}
+                  className="tabular-nums leading-none value-update"
+                  style={{
+                    fontSize: 34,
+                    fontWeight: 700,
+                    letterSpacing: "-0.025em",
+                    color: amount && amount !== "0" ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.1)",
+                  }}
+                >
+                  {amount || "0"}
+                </p>
+              ) : (
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={amount}
+                  onChange={(e) => onAmountChange?.(e.target.value)}
+                  className="w-full bg-transparent text-[34px] font-bold text-white placeholder:text-white/[0.1] outline-none tabular-nums leading-none"
+                  style={{ letterSpacing: "-0.025em" }}
+                  min="0"
+                />
+              )}
+            </div>
+
             <button
-              onClick={() => setOpen(!open)}
-              className="flex items-center gap-2 py-1 active:opacity-70 transition-opacity"
+              onClick={() => onOpenChange(!isOpen)}
+              className="flex items-center gap-2 py-1 active:opacity-70 transition-opacity shrink-0"
             >
               {isNative ? (
                 <ChainIcon chainId="world-chain" size={24} />
@@ -175,110 +254,122 @@ function TokenBlock({
               <ChevronDown
                 size={9}
                 strokeWidth={2.25}
-                className={`transition-transform ${open ? "rotate-180" : ""}`}
+                className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
                 style={{ color: "rgba(255,255,255,0.18)", marginLeft: -1 }}
               />
             </button>
+          </div>
 
-            {open && (
-              <div
-                className="absolute right-0 z-30 rounded-2xl overflow-y-auto shadow-2xl dropdown-enter"
-                style={{
-                  top: "calc(100% + 6px)",
-                  width: 240,
-                  maxHeight: 360,
-                  background: "#1a1a1a",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}
+          <p
+            className="mt-2"
+            style={{
+              fontSize: 11,
+              fontWeight: 400,
+              color: isReadOnly ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.22)",
+            }}
+          >
+            {displaySubtext}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Token picker — fixed bottom sheet ─────────────────────────────── */}
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40"
+            style={{ background: "rgba(0,0,0,0.65)" }}
+            onClick={() => onOpenChange(false)}
+          />
+
+          {/* Sheet */}
+          <div
+            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl overflow-hidden"
+            style={{
+              maxWidth: 430,
+              margin: "0 auto",
+              background: "#181818",
+              border: "1px solid rgba(255,255,255,0.07)",
+              borderBottom: "none",
+              maxHeight: "72vh",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {/* Sheet header */}
+            <div
+              className="flex items-center justify-between px-4 shrink-0"
+              style={{
+                paddingTop: 16,
+                paddingBottom: 14,
+                borderBottom: "1px solid rgba(255,255,255,0.06)",
+              }}
+            >
+              <p className="text-[16px] font-bold text-white">{pickerLabel}</p>
+              <button
+                onClick={() => onOpenChange(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center active:bg-white/10"
+                style={{ background: "rgba(255,255,255,0.06)" }}
               >
-                {/* Native ETH */}
+                <X size={15} style={{ color: "rgba(255,255,255,0.6)" }} />
+              </button>
+            </div>
+
+            {/* Scrollable token list */}
+            <div className="overflow-y-auto flex-1">
+              {/* Native ETH */}
+              {showNative && (
                 <button
-                  onClick={() => { onTokenChange(nativeToken()); setOpen(false); }}
+                  onClick={() => { onTokenChange(nativeToken()); onOpenChange(false); }}
                   className="w-full flex items-center gap-3 px-4 py-3 active:bg-white/5 transition-colors"
                 >
-                  <ChainIcon chainId="world-chain" size={28} />
+                  <ChainIcon chainId="world-chain" size={32} />
                   <div className="flex-1 text-left min-w-0">
-                    <p className="text-[13px] font-semibold text-white">{WORLD_CHAIN.symbol}</p>
-                    <p className="text-[10px] mt-[2px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+                    <p className="text-[14px] font-semibold text-white">{WORLD_CHAIN.symbol}</p>
+                    <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.3)" }}>
                       World Chain · Native
                     </p>
                   </div>
-                  {isNative && <Check size={12} className="text-purple-400 shrink-0" />}
+                  {isNative && <Check size={13} className="text-purple-400 shrink-0" />}
                 </button>
+              )}
 
-                {/* Tokens — held first, then all others */}
-                {(() => {
-                  const held = heldAddresses && heldAddresses.size > 0
-                    ? WORLD_CHAIN_TOKENS.filter(t => heldAddresses.has(t.address.toLowerCase()))
-                    : [];
-                  const others = held.length > 0
-                    ? WORLD_CHAIN_TOKENS.filter(t => !heldAddresses!.has(t.address.toLowerCase()))
-                    : WORLD_CHAIN_TOKENS;
+              {/* Held tokens section */}
+              {held.length > 0 && (
+                <>
+                  <div className="mx-4 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                  <p
+                    className="px-4 pt-2.5 pb-1"
+                    style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}
+                  >
+                    Your tokens
+                  </p>
+                  {held.map((t) => <TokenRow key={t.address} t={t} />)}
+                </>
+              )}
 
-                  function TokenRow({ t }: { t: typeof WORLD_CHAIN_TOKENS[number] }) {
-                    const isSelected = !isNative && t.address.toLowerCase() === token.address.toLowerCase();
-                    return (
-                      <button
-                        key={t.address}
-                        onClick={() => {
-                          onTokenChange({ address: t.address, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI, name: t.name });
-                          setOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 active:bg-white/5 transition-colors"
-                      >
-                        <TokenIcon logoURI={t.logoURI} symbol={t.symbol} size={28} />
-                        <div className="flex-1 text-left min-w-0">
-                          <p className="text-[13px] font-semibold text-white">{t.symbol}</p>
-                          <p className="text-[10px] truncate mt-[2px]" style={{ color: "rgba(255,255,255,0.3)" }}>
-                            {t.name}
-                          </p>
-                        </div>
-                        {isSelected && <Check size={12} className="text-purple-400 shrink-0" />}
-                      </button>
-                    );
-                  }
+              {/* All other tokens */}
+              {others.length > 0 && (
+                <>
+                  <div className="mx-4 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                  <p
+                    className="px-4 pt-2.5 pb-1"
+                    style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}
+                  >
+                    {held.length > 0 ? "All tokens" : "Tokens"}
+                  </p>
+                  {others.map((t) => <TokenRow key={t.address} t={t} />)}
+                </>
+              )}
 
-                  return (
-                    <>
-                      <div className="mx-4 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-                      {held.length > 0 && (
-                        <>
-                          <p className="px-4 pt-2 pb-1" style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}>
-                            Your tokens
-                          </p>
-                          {held.map(t => <TokenRow key={t.address} t={t} />)}
-                          <div className="mx-4 h-px my-1" style={{ background: "rgba(255,255,255,0.05)" }} />
-                          <p className="px-4 pt-1 pb-1" style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}>
-                            All tokens
-                          </p>
-                        </>
-                      )}
-                      {!held.length && (
-                        <p className="px-4 pt-2 pb-1" style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.08em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}>
-                          Tokens
-                        </p>
-                      )}
-                      {others.map(t => <TokenRow key={t.address} t={t} />)}
-                    </>
-                  );
-                })()}
-              </div>
-            )}
+              {/* Safe scroll padding */}
+              <div style={{ height: 24 }} />
+            </div>
           </div>
-        </div>
-
-        <p
-          className="mt-2"
-          style={{
-            fontSize: 11,
-            fontWeight: 400,
-            color: isReadOnly ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.22)",
-          }}
-        >
-          {displaySubtext}
-        </p>
-      </div>
-    </div>
+        </>
+      )}
+    </>
   );
 }
 
@@ -399,9 +490,12 @@ function NoRouteSuggestions({ fromToken }: { fromToken: TokenState }) {
 export default function BridgeView({
   address,
   heldAddresses,
+  balanceMap,
 }: {
   address: string | null;
   heldAddresses?: Set<string>;
+  /** address.toLowerCase() → human-readable token balance */
+  balanceMap?: Record<string, number>;
 }) {
   const [fromToken, setFromToken] = useState<TokenState>(nativeToken());
   const [toToken, setToToken] = useState<TokenState>(usdcToken);
@@ -412,6 +506,8 @@ export default function BridgeView({
   const [isExecuting, setIsExecuting] = useState(false);
   const [quoteAgeMs, setQuoteAgeMs] = useState(0);
   const [pendingFreshQuote, setPendingFreshQuote] = useState<UniswapQuoteResult | null>(null);
+  // Which picker is open — only one at a time
+  const [openPicker, setOpenPicker] = useState<"from" | "to" | null>(null);
   const executionInFlight = useRef(false);
 
   // Universal Protocol state
@@ -419,21 +515,54 @@ export default function BridgeView({
   const [upQuoteLoading, setUpQuoteLoading] = useState(false);
   const [upQuoteError, setUpQuoteError] = useState<string | null>(null);
 
-  // Routing: use Universal Protocol when either token is a UP-routable token
-  // (not ETH native, not core DEX tokens like WLD/WETH/WBTC)
+  // ── Routing logic ─────────────────────────────────────────────────────────
+
   const useUPRouting = useMemo(() => {
     return isUPToken(fromToken.address) || isUPToken(toToken.address);
   }, [fromToken.address, toToken.address]);
 
-  // For UP routing: determine order type
-  // BUY = paying USDC.e to get u-token; SELL = paying u-token to get USDC.e
   const upOrderType = useMemo<"BUY" | "SELL" | null>(() => {
     if (!useUPRouting) return null;
-    const fromIsUSDC = fromToken.address.toLowerCase() === USDC_E_ADDRESS.toLowerCase();
+    const fromIsUSDC = fromToken.address.toLowerCase() === USDC_E_LOWER;
     if (fromIsUSDC && isUPToken(toToken.address)) return "BUY";
-    if (isUPToken(fromToken.address) && toToken.address.toLowerCase() === USDC_E_ADDRESS.toLowerCase()) return "SELL";
-    return null; // e.g. uBNB → uSOL — not directly supported; show guidance
+    if (isUPToken(fromToken.address) && toToken.address.toLowerCase() === USDC_E_LOWER) return "SELL";
+    return null;
   }, [useUPRouting, fromToken.address, toToken.address]);
+
+  // ── Token filtering ───────────────────────────────────────────────────────
+  // Restrict the "to" picker based on what routes exist from "from" token:
+  //   - USDC.e as from → all tokens (Uniswap DEX + UP u-tokens)
+  //   - UP token as from → only USDC.e
+  //   - Any other DEX token as from → only DEX tokens (no u-tokens)
+  const allowedToAddresses = useMemo<Set<string> | null>(() => {
+    const from = fromToken.address.toLowerCase();
+    if (from === USDC_E_LOWER) return null; // USDC.e can route to everything
+    if (isUPToken(fromToken.address)) return new Set([USDC_E_LOWER]);
+    return DEX_ADDRESSES; // ETH/WLD/WETH/WBTC/oXAUt → DEX tokens only
+  }, [fromToken.address]);
+
+  // Auto-reset toToken if it's no longer valid after fromToken changes
+  useEffect(() => {
+    if (allowedToAddresses && !allowedToAddresses.has(toToken.address.toLowerCase())) {
+      setToToken(usdcToken());
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromToken.address]);
+
+  // ── Balance helpers ───────────────────────────────────────────────────────
+
+  const fromBalance = useMemo(() => {
+    if (!balanceMap) return undefined;
+    return balanceMap[fromToken.address.toLowerCase()];
+  }, [balanceMap, fromToken.address]);
+
+  const handleMax = useCallback(() => {
+    if (fromBalance !== undefined) {
+      setAmount(fromBalance.toString());
+    }
+  }, [fromBalance]);
+
+  // ── Uniswap quote ─────────────────────────────────────────────────────────
 
   const {
     data: quoteResult,
@@ -446,7 +575,6 @@ export default function BridgeView({
     decimalsIn: fromToken.decimals,
     decimalsOut: toToken.decimals,
     fromAddress: address,
-    // Skip Uniswap quote when routing via Universal Protocol
     enabled: !useUPRouting,
   });
 
@@ -458,7 +586,8 @@ export default function BridgeView({
     return () => clearInterval(id);
   }, [dataUpdatedAt]);
 
-  // ── Universal Protocol quote fetch ───────────────────────────────────────────
+  // ── Universal Protocol quote ──────────────────────────────────────────────
+
   useEffect(() => {
     if (!useUPRouting || !upOrderType || !address || !amount || Number(amount) <= 0) {
       setUpQuote(null);
@@ -489,7 +618,7 @@ export default function BridgeView({
       } finally {
         if (!controller.signal.aborted) setUpQuoteLoading(false);
       }
-    }, 600); // 600ms debounce
+    }, 600);
 
     return () => {
       controller.abort();
@@ -498,11 +627,10 @@ export default function BridgeView({
     };
   }, [useUPRouting, upOrderType, address, amount, fromToken, toToken]);
 
-  // Formatted output amount for UP route
   const upToAmount = useMemo(() => {
     if (!upQuote) return "";
     const raw = upOrderType === "BUY" ? upQuote.token_amount : upQuote.pair_token_amount;
-    const decimals = upOrderType === "BUY" ? toToken.decimals : 6; // USDC.e = 6 dec
+    const decimals = upOrderType === "BUY" ? toToken.decimals : 6;
     return formatAmount(raw, decimals);
   }, [upQuote, upOrderType, toToken.decimals]);
 
@@ -518,7 +646,7 @@ export default function BridgeView({
     ? !!upQuote && !upQuoteLoading && Number(amount) > 0 && !!address && !!upOrderType
     : !!quoteResult && !quoteFetching && Number(amount) > 0 && !!address;
 
-  // ── submitWithQuote ──────────────────────────────────────────────────────────
+  // ── submitWithQuote ───────────────────────────────────────────────────────
 
   const submitWithQuote = useCallback(
     async (result: UniswapQuoteResult) => {
@@ -532,7 +660,6 @@ export default function BridgeView({
 
       const transactions: Array<{ to: `0x${string}`; data: `0x${string}`; value: string }> = [];
 
-      // Approval for ERC-20 input (exact amount, not unlimited)
       if (!isFromNative) {
         transactions.push({
           to: fromToken.address as `0x${string}`,
@@ -542,7 +669,6 @@ export default function BridgeView({
       }
 
       if (isToNative) {
-        // ERC-20 → native ETH: multicall [swap to WETH9 at router, unwrapWETH9 to user]
         transactions.push({
           to: UNISWAP_SWAP_ROUTER as `0x${string}`,
           data: buildSwapToEthCalldata({
@@ -555,7 +681,6 @@ export default function BridgeView({
           value: "0x0",
         });
       } else {
-        // ETH → ERC-20 or ERC-20 → ERC-20
         const resolvedOut = resolveForUniswap(toToken.address);
         transactions.push({
           to: UNISWAP_SWAP_ROUTER as `0x${string}`,
@@ -567,7 +692,6 @@ export default function BridgeView({
             amountIn: amountInWei,
             amountOutMinimum: amountOutMin,
           }),
-          // Send ETH value when tokenIn resolves to WETH9 (i.e. native ETH input)
           value: isFromNative ? `0x${amountInWei.toString(16)}` : "0x0",
         });
       }
@@ -577,21 +701,15 @@ export default function BridgeView({
           chainId: WORLD_CHAIN_ID,
           transactions,
         });
-        // MiniKit v2: on success returns { status: "success", userOpHash, ... }
-        // On error it throws SendTransactionError — so if we reach here it succeeded.
-        // We check status to be safe; userOpHash may be "" (String(null ?? "")) on some
-        // World App versions even though the tx was submitted.
-        const result = res as { status?: string; userOpHash?: string };
-        if (result?.status === "success" || result?.userOpHash) {
-          setTxHash(result?.userOpHash ?? "");
+        const result2 = res as { status?: string; userOpHash?: string };
+        if (result2?.status === "success" || result2?.userOpHash) {
+          setTxHash(result2?.userOpHash ?? "");
           setStep("success");
         } else {
           setErrorMsg("Transaction was not confirmed. Please try again.");
           setStep("error");
         }
       } catch (e) {
-        // SendTransactionError stores the code in .code ("user_rejected", "invalid_contract", etc.)
-        // and sets .message = "Transaction failed: ${code}"
         const code = (e as { code?: string })?.code ?? "";
         const msg =
           code === "user_rejected"
@@ -612,7 +730,7 @@ export default function BridgeView({
     [address, fromToken, toToken, amount],
   );
 
-  // ── executeUniversal ─────────────────────────────────────────────────────────
+  // ── executeUniversal ──────────────────────────────────────────────────────
 
   const executeUniversal = useCallback(async () => {
     if (executionInFlight.current || !address || !upOrderType) return;
@@ -620,7 +738,6 @@ export default function BridgeView({
     setIsExecuting(true);
 
     try {
-      // 1. Get a fresh quote right before signing
       const upSymbol =
         upOrderType === "BUY" ? getUPSymbol(toToken.address) : getUPSymbol(fromToken.address);
       if (!upSymbol) throw new Error("Token not supported by Universal Protocol");
@@ -632,12 +749,10 @@ export default function BridgeView({
           : { type: "SELL", token: upSymbol, pair_token: "USDC", blockchain: "WORLD", slippage_bips: 20, user_address: address, token_amount: amtWei }
       );
 
-      // 2. Build EIP-712 typed data via universal-sdk
       const { generateTypedData } = await import("universal-sdk");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { typedData } = await generateTypedData(freshQuote as any);
 
-      // 3. Ask user to sign (no gas) via MiniKit signTypedData
       const signResult = await MiniKit.signTypedData({
         ...typedData,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -645,8 +760,6 @@ export default function BridgeView({
         chainId: 480,
       });
 
-      // 4. Submit signed order to Universal Protocol relayer
-      // CommandResultByVia wraps the payload — signature is at .data.signature
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const signature = (signResult as any)?.data?.signature ?? (signResult as any)?.signature ?? "";
       const { transaction_hash } = await submitUPOrder(freshQuote, signature);
@@ -668,7 +781,7 @@ export default function BridgeView({
     }
   }, [address, upOrderType, fromToken, toToken, amount]);
 
-  // ── execute ──────────────────────────────────────────────────────────────────
+  // ── execute ───────────────────────────────────────────────────────────────
 
   const execute = useCallback(async () => {
     if (executionInFlight.current || !address) return;
@@ -688,7 +801,6 @@ export default function BridgeView({
         return;
       }
 
-      // Security: validate the router we'll call
       if (!isKnownRouter(UNISWAP_SWAP_ROUTER)) {
         setErrorMsg("Router address not recognized. Aborting for safety.");
         setStep("error");
@@ -708,7 +820,6 @@ export default function BridgeView({
         feeLabel: feeLabel(freshQuote.fee),
       };
 
-      // Price drift check: if fresh output is >1.5% worse than displayed, pause
       if (quoteResult) {
         const displayedOut = quoteResult.amountOut;
         const freshOut = freshQuote.amountOut;
@@ -741,7 +852,7 @@ export default function BridgeView({
     ? WORLD_CHAIN.symbol
     : toToken.symbol;
 
-  // ── Success screen ────────────────────────────────────────────────────────────
+  // ── Success screen ────────────────────────────────────────────────────────
 
   if (step === "success") {
     return (
@@ -815,7 +926,7 @@ export default function BridgeView({
     );
   }
 
-  // ── Quote-changed screen ──────────────────────────────────────────────────────
+  // ── Quote-changed screen ──────────────────────────────────────────────────
 
   if (step === "quote-changed" && pendingFreshQuote) {
     const prevOut = quoteResult?.amountOutFormatted ?? "—";
@@ -915,7 +1026,7 @@ export default function BridgeView({
     );
   }
 
-  // ── Error screen ──────────────────────────────────────────────────────────────
+  // ── Error screen ──────────────────────────────────────────────────────────
 
   if (step === "error") {
     const isUserCancelled = errorMsg === "Swap cancelled.";
@@ -977,12 +1088,11 @@ export default function BridgeView({
     );
   }
 
-  // ── Form ──────────────────────────────────────────────────────────────────────
+  // ── Form ──────────────────────────────────────────────────────────────────
 
   const hasAmount = Number(amount) > 0;
 
-  // UP-specific states
-  const upUnsupportedPair = useUPRouting && !!upOrderType === false && hasAmount;
+  const upUnsupportedPair = useUPRouting && !upOrderType && hasAmount;
   const isFetchingRoute = useUPRouting
     ? upQuoteLoading && hasAmount
     : quoteFetching && hasAmount && !isExecuting;
@@ -1036,10 +1146,14 @@ export default function BridgeView({
       <TokenBlock
         label="You pay"
         token={fromToken}
-        onTokenChange={setFromToken}
+        onTokenChange={(t) => { setFromToken(t); setAmount(""); }}
         amount={amount}
         onAmountChange={setAmount}
         heldAddresses={heldAddresses}
+        balance={fromBalance}
+        onMax={handleMax}
+        isOpen={openPicker === "from"}
+        onOpenChange={(open) => setOpenPicker(open ? "from" : null)}
       />
 
       {/* ── Flip ────────────────────────────────────────────────────────── */}
@@ -1066,7 +1180,11 @@ export default function BridgeView({
         onTokenChange={setToToken}
         amount={toAmount}
         isReadOnly
-        isLoading={quoteFetching && hasAmount}
+        isLoading={isFetchingRoute}
+        heldAddresses={heldAddresses}
+        allowedAddresses={allowedToAddresses}
+        isOpen={openPicker === "to"}
+        onOpenChange={(open) => setOpenPicker(open ? "to" : null)}
       />
 
       {/* ── Route details ───────────────────────────────────────────────── */}
