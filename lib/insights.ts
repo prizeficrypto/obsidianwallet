@@ -269,58 +269,91 @@ export function generateMarketEvents(
     if (diff > 0.5) {
       events.push({
         id: "outperform",
-        text: `Your portfolio beat the broader market today — your holdings moved more than crypto as a whole`,
+        text: `Your portfolio outperformed the broader market by ${Math.abs(diff).toFixed(1)}% today`,
         sentiment: "positive",
       });
     } else if (diff < -0.5) {
+      const verb = marketChange24h > 0 ? "rallied" : "sold off";
       events.push({
         id: "underperform",
-        text: `Broader crypto ${marketChange24h > 0 ? "rallied" : "sold off"} today, but your holdings lagged the market move`,
+        text: `Crypto ${verb} ${Math.abs(marketChange24h).toFixed(1)}% but your holdings lagged by ${Math.abs(diff).toFixed(1)}%`,
         sentiment: "negative",
       });
     }
   }
 
-  // 2 · Trending holdings — if an asset the user holds is trending
+  // 2a · Trending holdings — if an asset the user holds is trending (most relevant signal)
   const trendingHeld = trendingCoins.filter((c) => heldSet.has(c.id));
   if (trendingHeld.length > 0) {
     const coin = trendingHeld[0];
     const change = coin.priceChange24h;
     const changeStr =
       change != null && Math.abs(change) > 0.5
-        ? ` (${change > 0 ? "+" : ""}${change.toFixed(1)}% today)`
+        ? ` — ${change > 0 ? "+" : ""}${change.toFixed(1)}% today`
         : "";
     events.push({
       id: "trending-held",
-      text: `${coin.symbol} is trending on CoinGecko \u2014 heightened market interest${changeStr}`,
+      text: `${coin.name} (${coin.symbol}) is trending on CoinGecko${changeStr}`,
       sentiment: change != null && change > 0 ? "positive" : "neutral",
     });
   }
 
-  // 3 · Significant broad market move
-  if (Math.abs(marketChange24h) > 3 && !events.some((e) => e.id === "outperform" || e.id === "underperform")) {
+  // 2b · Hot sector — trending category with meaningful move
+  if (events.length < 2) {
+    const hotCat = trendingCategories.find(
+      (c) => c.marketCapChange24h != null && Math.abs(c.marketCapChange24h) > 2,
+    );
+    if (hotCat && hotCat.marketCapChange24h != null) {
+      const dir = hotCat.marketCapChange24h > 0 ? "up" : "down";
+      events.push({
+        id: "hot-sector",
+        text: `${hotCat.name} tokens ${dir} ${Math.abs(hotCat.marketCapChange24h).toFixed(1)}% today`,
+        sentiment: hotCat.marketCapChange24h > 0 ? "positive" : "negative",
+      });
+    }
+  }
+
+  // 3 · Top trending coin (not held) driving broader moves
+  if (events.length < 2) {
+    const topNonHeld = trendingCoins.find(
+      (c) => !heldSet.has(c.id) && c.priceChange24h != null && Math.abs(c.priceChange24h) > 3,
+    );
+    if (topNonHeld && topNonHeld.priceChange24h != null) {
+      const dir = topNonHeld.priceChange24h > 0 ? "surging" : "falling";
+      events.push({
+        id: "trending-other",
+        text: `${topNonHeld.name} (${topNonHeld.symbol}) ${dir} ${Math.abs(topNonHeld.priceChange24h).toFixed(1)}% — most watched coin today`,
+        sentiment: topNonHeld.priceChange24h > 0 ? "positive" : "negative",
+      });
+    }
+  }
+
+  // 4 · Significant broad market move
+  if (events.length < 2 && Math.abs(marketChange24h) > 3) {
     const verb = marketChange24h > 0 ? "rallied" : "sold off";
+    // Surface a trending category as a potential cause if available
+    const bigCat = trendingCategories[0];
+    const causeStr = bigCat ? ` — ${bigCat.name} sector leading the move` : " — likely macro-driven";
     events.push({
       id: "big-move",
-      text: `Crypto market ${verb} ${Math.abs(marketChange24h).toFixed(1)}% today \u2014 likely driven by macro conditions`,
+      text: `Crypto market ${verb} ${Math.abs(marketChange24h).toFixed(1)}% today${causeStr}`,
       sentiment: marketChange24h > 0 ? "positive" : "negative",
     });
   }
-
 
   // 5 · BTC dominance (only if room and notable)
   if (events.length < 2) {
     if (btcDominance > 58) {
       events.push({
         id: "btc-dom",
-        text: `BTC dominance at ${btcDominance.toFixed(0)}% \u2014 capital concentrating in Bitcoin`,
+        text: `BTC dominance at ${btcDominance.toFixed(0)}% — capital rotating into Bitcoin away from alts`,
         sentiment: "neutral",
       });
     } else if (btcDominance < 45) {
       events.push({
         id: "btc-dom",
-        text: `BTC dominance at ${btcDominance.toFixed(0)}% \u2014 altcoins gaining market share`,
-        sentiment: "neutral",
+        text: `BTC dominance at ${btcDominance.toFixed(0)}% — altcoins gaining market share over Bitcoin`,
+        sentiment: "positive",
       });
     }
   }
@@ -329,15 +362,19 @@ export function generateMarketEvents(
   if (events.length === 0) {
     if (Math.abs(marketChange24h) > 0.1) {
       const dir = marketChange24h > 0 ? "up" : "down";
+      const topTrend = trendingCoins[0];
+      const trendStr = topTrend ? ` · ${topTrend.name} trending` : "";
       events.push({
         id: "market-mild",
-        text: `Crypto market ${dir} ${Math.abs(marketChange24h).toFixed(1)}% today \u00b7 BTC dominance ${btcDominance.toFixed(0)}%`,
-        sentiment: "neutral",
+        text: `Crypto market ${dir} ${Math.abs(marketChange24h).toFixed(1)}%${trendStr} · BTC dom ${btcDominance.toFixed(0)}%`,
+        sentiment: marketChange24h > 0 ? "positive" : "negative",
       });
     } else {
+      const topTrend = trendingCoins[0];
+      const trendStr = topTrend ? ` · ${topTrend.name} is today's most watched coin` : "";
       events.push({
         id: "market-flat",
-        text: `Markets quiet today \u00b7 BTC dominance ${btcDominance.toFixed(0)}%`,
+        text: `Markets quiet today${trendStr}`,
         sentiment: "neutral",
       });
     }

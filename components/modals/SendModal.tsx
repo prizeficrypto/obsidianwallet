@@ -400,8 +400,8 @@ export default function SendModal({ address, isInWorldApp, onClose, balanceMap }
             <button
               onClick={() => setStep("confirm")}
               disabled={!canProceed}
-              className="w-full py-4 rounded-2xl text-sm font-semibold text-white disabled:opacity-30 transition-opacity"
-              style={{ background: "#6C5CE7" }}
+              className="w-full py-4 rounded-2xl text-sm font-semibold disabled:opacity-30 transition-opacity"
+              style={{ background: "white", color: "#111111" }}
             >
               Review Send
             </button>

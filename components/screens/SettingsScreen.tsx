@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ChevronRight, Shield, Globe, Eye, EyeOff, LogOut, ExternalLink, Vibrate, Check } from "lucide-react";
+import { ArrowLeft, ChevronRight, Shield, Globe, Eye, EyeOff, LogOut, ExternalLink, Vibrate, Check, Languages } from "lucide-react";
 import { useSettingsStore } from "@/store/settingsStore";
+import { useI18nStore, type Language } from "@/store/i18nStore";
 import { formatAddress } from "@/lib/format";
 import type { WalletState } from "@/hooks/useWallet";
 
@@ -87,6 +88,107 @@ function SettingGroup({ children }: { children: React.ReactNode }) {
 }
 
 import { CURRENCY_SYMBOLS, CURRENCY_NAMES } from "@/hooks/useCurrency";
+
+// ─── Language Picker ──────────────────────────────────────────────────────────
+
+const LANGUAGE_OPTIONS: { code: Language; flag: string; name: string; native: string }[] = [
+  { code: "en", flag: "🇺🇸", name: "English",    native: "English"    },
+  { code: "fr", flag: "🇫🇷", name: "French",     native: "Français"   },
+  { code: "es", flag: "🇪🇸", name: "Spanish",    native: "Español"    },
+  { code: "pt", flag: "🇧🇷", name: "Portuguese", native: "Português"  },
+  { code: "id", flag: "🇮🇩", name: "Indonesian", native: "Indonesia"  },
+  { code: "de", flag: "🇩🇪", name: "German",     native: "Deutsch"    },
+  { code: "vi", flag: "🇻🇳", name: "Vietnamese", native: "Tiếng Việt" },
+  { code: "it", flag: "🇮🇹", name: "Italian",    native: "Italiano"   },
+];
+
+function LanguagePicker({
+  current,
+  onSelect,
+  onClose,
+}: {
+  current: Language;
+  onSelect: (lang: Language) => void;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div
+        onClick={onClose}
+        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 80 }}
+      />
+      <div
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "100%",
+          maxWidth: 430,
+          background: "#111111",
+          borderRadius: "20px 20px 0 0",
+          borderTop: "1px solid rgba(255,255,255,0.07)",
+          zIndex: 90,
+          paddingBottom: "env(safe-area-inset-bottom, 20px)",
+        }}
+      >
+        <div style={{ padding: "12px 20px 14px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          <div style={{ width: 32, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.1)", margin: "0 auto 12px" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              onClick={onClose}
+              style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: "#1e1e1e",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0, border: "none", cursor: "pointer",
+              }}
+            >
+              <ArrowLeft size={15} strokeWidth={2} style={{ color: "rgba(255,255,255,0.6)" }} />
+            </button>
+            <p style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.88)", letterSpacing: "-0.01em" }}>
+              Language
+            </p>
+          </div>
+        </div>
+        <div style={{ paddingTop: 4, paddingBottom: 8, overflowY: "auto", maxHeight: "60vh" }}>
+          {LANGUAGE_OPTIONS.map((opt, i) => (
+            <div key={opt.code}>
+              <button
+                onClick={() => { onSelect(opt.code); onClose(); }}
+                className="w-full flex items-center gap-3 px-5 active:bg-white/[0.03] transition-colors"
+                style={{ paddingTop: 13, paddingBottom: 13 }}
+              >
+                <div
+                  style={{
+                    width: 36, height: 36, borderRadius: "50%",
+                    background: "#1e1e1e",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0, fontSize: 18,
+                  }}
+                >
+                  {opt.flag}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.88)", letterSpacing: "-0.01em" }}>
+                    {opt.native}
+                  </p>
+                  <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>
+                    {opt.name}
+                  </p>
+                </div>
+                {current === opt.code && <Check size={15} strokeWidth={2.5} style={{ color: "#6C5CE7", flexShrink: 0 }} />}
+              </button>
+              {i < LANGUAGE_OPTIONS.length - 1 && (
+                <div style={{ height: 1, marginLeft: 68, marginRight: 20, background: "rgba(255,255,255,0.04)" }} />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
 
 const CURRENCIES = [
   "USD", "EUR", "GBP", "JPY", "KRW", "ARS",
@@ -191,7 +293,10 @@ function CurrencyPicker({
 
 export default function SettingsScreen({ wallet, onBack }: SettingsScreenProps) {
   const { hideBalances, setHideBalances, haptics, setHaptics, currency, setCurrency } = useSettingsStore();
+  const { language, setLanguage } = useI18nStore();
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
+  const currentLang = LANGUAGE_OPTIONS.find((l) => l.code === language);
 
   return (
     <div className="flex flex-col h-full overflow-hidden" style={{ background: "#0a0a0a" }}>
@@ -279,6 +384,13 @@ export default function SettingsScreen({ wallet, onBack }: SettingsScreenProps) 
             icon={<Globe size={15} className="text-white/50" />}
             onPress={() => setCurrencyPickerOpen(true)}
           />
+          <Divider />
+          <SettingRow
+            label="Language"
+            value={currentLang?.native ?? "English"}
+            icon={<Languages size={15} className="text-white/50" />}
+            onPress={() => setLanguagePickerOpen(true)}
+          />
         </SettingGroup>
 
         {/* Security */}
@@ -325,6 +437,14 @@ export default function SettingsScreen({ wallet, onBack }: SettingsScreenProps) 
           current={currency}
           onSelect={setCurrency}
           onClose={() => setCurrencyPickerOpen(false)}
+        />
+      )}
+
+      {languagePickerOpen && (
+        <LanguagePicker
+          current={language}
+          onSelect={setLanguage}
+          onClose={() => setLanguagePickerOpen(false)}
         />
       )}
     </div>

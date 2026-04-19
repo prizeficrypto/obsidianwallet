@@ -318,7 +318,7 @@ export default function PortfolioScreen({
       </div>
 
       {/* Time range tabs */}
-      <div className="flex items-center gap-1 px-4 mt-2.5 mb-1">
+      <div className="flex items-center gap-1 px-4 mt-2.5">
         {TIME_RANGES.map((r) => {
           const active = chartDays === r.days;
           return (
@@ -345,6 +345,14 @@ export default function PortfolioScreen({
           );
         })}
       </div>
+
+      {/* Chart disclaimer */}
+      <p
+        className="mx-4 mt-1.5 mb-0"
+        style={{ fontSize: 10, color: "rgba(255,255,255,0.22)", lineHeight: 1.4, letterSpacing: "0.01em" }}
+      >
+        * Assumes current holdings held for the full period shown — does not reflect past trades or deposits.
+      </p>
 
       {/* Allocation section */}
       {showAllocation && (
@@ -441,14 +449,6 @@ export default function PortfolioScreen({
         </div>
       )}
 
-      {/* Disclaimer */}
-      <p
-        className="mx-4 mt-6 text-center"
-        style={{ fontSize: 10, color: "rgba(255,255,255,0.1)", lineHeight: 1.4 }}
-      >
-        Chart assumes current holdings held for the period shown.
-        {"\n"}Does not reflect past trades or deposits.
-      </p>
     </div>
   );
 }

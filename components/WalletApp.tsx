@@ -5,6 +5,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { useTokenPrices } from "@/hooks/useTokenPrices";
 import { useChainBalances, useTotalBalance } from "@/hooks/useChainBalances";
 import { useWldBalance } from "@/hooks/useWldBalance";
+import { usePortfolioChart } from "@/hooks/usePortfolioChart";
 
 import WelcomeScreen, { EmptyWalletCard } from "./WelcomeScreen";
 import OnboardingScreen from "./OnboardingScreen";
@@ -79,6 +80,28 @@ export default function WalletApp() {
   }, [wldBalance, tokenBalances]);
   const isBalanceLoading = balancesLoading || !prices;
   const isEmpty = !isBalanceLoading && totalUSD === 0;
+
+  // 1D portfolio chart for home screen sparkline
+  const homeChartHoldings = useMemo(() => {
+    const result: { coingeckoId: string; amount: number }[] = [];
+    if (wldBalance) {
+      const amt = parseFloat(wldBalance.formatted);
+      if (amt > 0) result.push({ coingeckoId: "worldcoin-wld", amount: amt });
+    }
+    for (const b of balances ?? []) {
+      if (b.nativeBalance > 0 && b.chain.coingeckoId) {
+        result.push({ coingeckoId: b.chain.coingeckoId, amount: b.nativeBalance });
+      }
+    }
+    for (const t of tokenBalances ?? []) {
+      if (t.balance > 0 && t.coingeckoId) {
+        result.push({ coingeckoId: t.coingeckoId, amount: t.balance });
+      }
+    }
+    return result;
+  }, [wldBalance, balances, tokenBalances]);
+
+  const { data: homeChartData } = usePortfolioChart(homeChartHoldings, 1);
 
   // Return-value features: "since you left" + movers
   const { sinceYouLeft, movers, dismissBanner, bannerDismissed } = useReturnValue({
@@ -161,6 +184,8 @@ export default function WalletApp() {
                     isLoading={isBalanceLoading}
                     address={wallet.address}
                     username={wallet.username}
+                    sparklineData={homeChartData ?? null}
+                    sinceYouLeft={sinceYouLeft}
                   />
                 )}
 

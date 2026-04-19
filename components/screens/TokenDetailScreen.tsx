@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 import {
   ArrowLeft, ExternalLink, Share2,
   ArrowUpRight, ArrowDownLeft, ArrowLeftRight,
-  Bookmark,
+  Bookmark, Pencil, X,
 } from "lucide-react";
 import { useTokenMarket, useTokenChart } from "@/hooks/useTokenDetail";
 import { Loader2, Check } from "lucide-react";
 import { useWatchlistStore } from "@/store/watchlistStore";
+import { useCostBasisStore } from "@/store/costBasisStore";
 import ChainIcon, { TokenIcon } from "@/components/ChainIcon";
 import InteractiveLineChart, { type ScrubPoint } from "@/components/InteractiveLineChart";
 import { renderPnlCard, sharePnlCard, type PnlCardData } from "@/lib/pnlCard";
@@ -115,8 +116,11 @@ export default function TokenDetailScreen({
   const [days, setDays] = useState<number>(1);
   const [shareState, setShareState] = useState<"idle" | "sharing" | "done">("idle");
   const [scrubPoint, setScrubPoint] = useState<ScrubPoint | null>(null);
+  const [editingCostBasis, setEditingCostBasis] = useState(false);
+  const [costBasisInput, setCostBasisInput] = useState("");
 
   const { format, rate, symbol: currencySymbol } = useCurrency();
+  const { entries: costBasisEntries, setEntry: setCostBasis, removeEntry: removeCostBasis } = useCostBasisStore();
 
   function fmtPrice(n: number | null | undefined): string {
     if (n == null || n === 0) return "—";
@@ -354,26 +358,164 @@ export default function TokenDetailScreen({
         {/* Divider */}
         <div className="mt-4" style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
 
-        {/* Your balance */}
-        <div className="px-4 pt-5 pb-1">
-          <p style={{ fontSize: 11, fontWeight: 400, color: "rgba(255,255,255,0.28)" }}>
-            Your balance
-          </p>
-          <div className="flex items-baseline justify-between mt-2">
-            <p
-              className="text-white font-bold tabular-nums leading-none"
-              style={{ fontSize: 24, letterSpacing: "-0.025em" }}
-            >
-              {token.balanceUSD > 0 ? format(token.balanceUSD) : "—"}
-            </p>
-            <p
-              className="tabular-nums"
-              style={{ fontSize: 13, fontWeight: 400, color: "rgba(255,255,255,0.3)" }}
-            >
-              {fmtBalance(token.balance, token.symbol)}
-            </p>
-          </div>
-        </div>
+        {/* Your balance + PnL — only shown when user holds this token */}
+        {token.balance > 0 && (() => {
+          const currentPrice = price ?? (token.balance > 0 ? token.balanceUSD / token.balance : 0);
+          const dailyChangeUSD = token.balanceUSD * (token.priceChange24h / 100);
+          const dailyChangePct = token.priceChange24h;
+          const storedCostBasis = token.coingeckoId ? costBasisEntries[token.coingeckoId] : undefined;
+          const avgCost = storedCostBasis?.avgCostUSD;
+          const unrealizedPnL = avgCost && currentPrice ? (currentPrice - avgCost) * token.balance : null;
+          const unrealizedPct = avgCost && avgCost > 0 && currentPrice ? ((currentPrice - avgCost) / avgCost) * 100 : null;
+
+          return (
+            <div className="px-4 pt-5 pb-1">
+              <p style={{ fontSize: 11, fontWeight: 400, color: "rgba(255,255,255,0.28)" }}>
+                Your balance
+              </p>
+              <div className="flex items-baseline justify-between mt-2">
+                <p
+                  className="text-white font-bold tabular-nums leading-none"
+                  style={{ fontSize: 24, letterSpacing: "-0.025em" }}
+                >
+                  {format(token.balanceUSD)}
+                </p>
+                <p
+                  className="tabular-nums"
+                  style={{ fontSize: 13, fontWeight: 400, color: "rgba(255,255,255,0.3)" }}
+                >
+                  {fmtBalance(token.balance, token.symbol)}
+                </p>
+              </div>
+
+              {/* Daily change */}
+              <div className="flex items-center gap-2 mt-2.5">
+                <div
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+                  style={{ background: "rgba(255,255,255,0.04)" }}
+                >
+                  <span style={{ fontSize: 10, fontWeight: 500, color: "rgba(255,255,255,0.3)", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                    24h
+                  </span>
+                  <span
+                    className="tabular-nums"
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: dailyChangePct >= 0 ? "#4ade80" : "#f87171",
+                    }}
+                  >
+                    {dailyChangePct >= 0 ? "+" : "−"}{format(Math.abs(dailyChangeUSD))}
+                    {" "}
+                    <span style={{ fontWeight: 500, opacity: 0.75 }}>
+                      ({dailyChangePct >= 0 ? "+" : ""}{dailyChangePct.toFixed(2)}%)
+                    </span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Unrealized PnL */}
+              {unrealizedPnL !== null && unrealizedPct !== null && (
+                <div className="flex items-center gap-2 mt-2">
+                  <div
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+                    style={{ background: "rgba(255,255,255,0.04)" }}
+                  >
+                    <span style={{ fontSize: 10, fontWeight: 500, color: "rgba(255,255,255,0.3)", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                      Total PnL
+                    </span>
+                    <span
+                      className="tabular-nums"
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: unrealizedPnL >= 0 ? "#4ade80" : "#f87171",
+                      }}
+                    >
+                      {unrealizedPnL >= 0 ? "+" : "−"}{format(Math.abs(unrealizedPnL))}
+                      {" "}
+                      <span style={{ fontWeight: 500, opacity: 0.75 }}>
+                        ({unrealizedPct >= 0 ? "+" : ""}{unrealizedPct.toFixed(2)}%)
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Cost basis row */}
+              {token.coingeckoId && (
+                <div className="mt-2.5">
+                  {editingCostBasis ? (
+                    <div className="flex items-center gap-2">
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", letterSpacing: "0.04em", textTransform: "uppercase", flexShrink: 0 }}>
+                        Avg cost
+                      </span>
+                      <div
+                        className="flex items-center gap-1 flex-1 px-2 py-1 rounded-lg"
+                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+                      >
+                        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{currencySymbol}</span>
+                        <input
+                          autoFocus
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={costBasisInput}
+                          onChange={(e) => setCostBasisInput(e.target.value)}
+                          placeholder="0.00"
+                          className="flex-1 bg-transparent text-sm text-white outline-none tabular-nums"
+                          style={{ fontSize: 13, fontWeight: 500, minWidth: 0 }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const v = parseFloat(costBasisInput);
+                              if (v > 0) setCostBasis(token.coingeckoId!, v / rate);
+                              setEditingCostBasis(false);
+                            }
+                            if (e.key === "Escape") setEditingCostBasis(false);
+                          }}
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          const v = parseFloat(costBasisInput);
+                          if (v > 0) setCostBasis(token.coingeckoId!, v / rate);
+                          setEditingCostBasis(false);
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold active:opacity-70 transition-opacity"
+                        style={{ background: "rgba(108,92,231,0.2)", color: "#9B8FFF" }}
+                      >
+                        Save
+                      </button>
+                      {avgCost && (
+                        <button
+                          onClick={() => { removeCostBasis(token.coingeckoId!); setEditingCostBasis(false); }}
+                          className="active:opacity-50 transition-opacity"
+                        >
+                          <X size={13} style={{ color: "rgba(255,255,255,0.3)" }} />
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setCostBasisInput(avgCost ? (avgCost * rate).toFixed(2) : "");
+                        setEditingCostBasis(true);
+                      }}
+                      className="flex items-center gap-1.5 active:opacity-60 transition-opacity"
+                    >
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.22)", letterSpacing: "0.02em" }}>
+                        {avgCost
+                          ? `Avg cost: ${currencySymbol}${(avgCost * rate).toLocaleString(undefined, { maximumFractionDigits: 4 })}`
+                          : "Set avg cost basis"}
+                      </span>
+                      <Pencil size={9} style={{ color: "rgba(255,255,255,0.2)" }} />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Actions */}
         <div className="px-4 pt-4 pb-2">
