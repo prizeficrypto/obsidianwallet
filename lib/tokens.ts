@@ -2,8 +2,17 @@
  * Curated token list for World Chain (chainId 480).
  *
  * Sources:
- *  - Universal Protocol official contract addresses (same across Base/Polygon/World/Katana)
+ *  - Universal Protocol official contract addresses (docs.universal.xyz/docs/developers/contract-addresses)
  *  - Uniswap / CoinGecko token lists for WBTC, WETH, USDC.e
+ *  - oXAUt: Chainlink CCIP bridged Tether Gold (distinct from Universal's uPAXG)
+ *
+ * Liquidity notes (as of 2026-04):
+ *  - Core assets (WLD, USDC.e, WETH, WBTC, oXAUt) have deep Uniswap V3/V4 pools
+ *  - uXRP, uSOL, uDOGE, uADA, uLINK, uXLM, uSUI have Uniswap V3 pools
+ *  - uTAO, uUNI, uBONK have thin Uniswap V4 pools
+ *  - All other Universal Protocol tokens exist on-chain but have no DEX liquidity;
+ *    they are displayed in the wallet for balance tracking only and are marked
+ *    swappable: false to hide them from the swap token picker.
  */
 
 export interface CuratedToken {
@@ -56,16 +65,17 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
       "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
   },
   {
-    address: "0xDCC74175fB91F84326a95922aD4D95D1a20CD559",
+    // Chainlink CCIP-bridged Tether Gold — confirmed address with Uniswap V3/V4 pools
+    address: "0x30974f73A4ac9E606Ed80da928e454977ac486D2",
     symbol: "oXAUt",
-    name: "PAX Gold",
-    decimals: 18,
+    name: "OpenXAUT",
+    decimals: 6,
     chainId: 480,
     logoURI:
-      "https://assets.coingecko.com/coins/images/9519/small/paxgold.png",
+      "https://assets.coingecko.com/coins/images/10481/small/Tether_Gold.png",
   },
 
-  // ── Universal Protocol wrapped assets (all 18 decimals) ──────────────────
+  // ── Universal Protocol tokens with confirmed Uniswap V3 pool liquidity ────
   {
     address: "0x2615a94df961278DcbC41Fb0a54fEc5f10a693aE",
     symbol: "uXRP",
@@ -74,15 +84,6 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     chainId: 480,
     logoURI:
       "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png",
-  },
-  {
-    address: "0x91B1b343aC321c0579Ed33854E20A98Ef881Cc89",
-    symbol: "uBNB",
-    name: "BNB (Universal)",
-    decimals: 18,
-    chainId: 480,
-    logoURI:
-      "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png",
   },
   {
     address: "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55",
@@ -130,24 +131,6 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
       "https://assets.coingecko.com/coins/images/100/small/Stellar_symbol_black_RGB.png",
   },
   {
-    address: "0x3EB097375fc2FC361e4a472f5E7067238c547c52",
-    symbol: "uLTC",
-    name: "Litecoin (Universal)",
-    decimals: 18,
-    chainId: 480,
-    logoURI:
-      "https://assets.coingecko.com/coins/images/2/small/litecoin.png",
-  },
-  {
-    address: "0xd6a34b430C05ac78c24985f8abEE2616BC1788Cb",
-    symbol: "uAVAX",
-    name: "Avalanche (Universal)",
-    decimals: 18,
-    chainId: 480,
-    logoURI:
-      "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png",
-  },
-  {
     address: "0xb0505e5a99abd03d94a1169e638B78EDfEd26ea4",
     symbol: "uSUI",
     name: "Sui (Universal)",
@@ -156,33 +139,8 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     logoURI:
       "https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg",
   },
-  {
-    address: "0xc79e06860Aa9564f95E08fb7E5b61458d0C63898",
-    symbol: "uHBAR",
-    name: "Hedera (Universal)",
-    decimals: 18,
-    chainId: 480,
-    logoURI:
-      "https://assets.coingecko.com/coins/images/3688/small/hbar.png",
-  },
-  {
-    address: "0x239b9C1F24F3423062B0d364796e07Ee905E9FcE",
-    symbol: "uSHIB",
-    name: "Shiba Inu (Universal)",
-    decimals: 18,
-    chainId: 480,
-    logoURI:
-      "https://assets.coingecko.com/coins/images/11939/small/shiba.png",
-  },
-  {
-    address: "0xf653E8B6Fcbd2A63246c6B7722d1e9d819611241",
-    symbol: "uCRO",
-    name: "Cronos (Universal)",
-    decimals: 18,
-    chainId: 480,
-    logoURI:
-      "https://assets.coingecko.com/coins/images/7310/small/cro_token_logo.png",
-  },
+
+  // ── Universal Protocol tokens with thin Uniswap V4 pool liquidity ─────────
   {
     address: "0xFdCa15bd55F350a36E63C47661914d80411d2C22",
     symbol: "uTAO",
@@ -202,11 +160,83 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
       "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984/logo.png",
   },
   {
+    address: "0xf56Ce53561a9cc084e094952232bBfE1e5fb599e",
+    symbol: "uBONK",
+    name: "Bonk (Universal)",
+    decimals: 18,
+    chainId: 480,
+    logoURI:
+      "https://assets.coingecko.com/coins/images/28600/small/bonk.jpg",
+  },
+
+  // ── Universal Protocol tokens — balance display only (no DEX liquidity) ───
+  {
+    address: "0x91B1b343aC321c0579Ed33854E20A98Ef881Cc89",
+    symbol: "uBNB",
+    name: "BNB (Universal)",
+    decimals: 18,
+    chainId: 480,
+
+    logoURI:
+      "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png",
+  },
+  {
+    address: "0x3EB097375fc2FC361e4a472f5E7067238c547c52",
+    symbol: "uLTC",
+    name: "Litecoin (Universal)",
+    decimals: 18,
+    chainId: 480,
+
+    logoURI:
+      "https://assets.coingecko.com/coins/images/2/small/litecoin.png",
+  },
+  {
+    address: "0xd6a34b430C05ac78c24985f8abEE2616BC1788Cb",
+    symbol: "uAVAX",
+    name: "Avalanche (Universal)",
+    decimals: 18,
+    chainId: 480,
+
+    logoURI:
+      "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png",
+  },
+  {
+    address: "0xc79e06860Aa9564f95E08fb7E5b61458d0C63898",
+    symbol: "uHBAR",
+    name: "Hedera (Universal)",
+    decimals: 18,
+    chainId: 480,
+
+    logoURI:
+      "https://assets.coingecko.com/coins/images/3688/small/hbar.png",
+  },
+  {
+    address: "0x239b9C1F24F3423062B0d364796e07Ee905E9FcE",
+    symbol: "uSHIB",
+    name: "Shiba Inu (Universal)",
+    decimals: 18,
+    chainId: 480,
+
+    logoURI:
+      "https://assets.coingecko.com/coins/images/11939/small/shiba.png",
+  },
+  {
+    address: "0xf653E8B6Fcbd2A63246c6B7722d1e9d819611241",
+    symbol: "uCRO",
+    name: "Cronos (Universal)",
+    decimals: 18,
+    chainId: 480,
+
+    logoURI:
+      "https://assets.coingecko.com/coins/images/7310/small/cro_token_logo.png",
+  },
+  {
     address: "0x0F813f4785b2360009F9aC9BF6121a85f109efc6",
     symbol: "uDOT",
     name: "Polkadot (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/12171/small/polkadot.png",
   },
@@ -216,6 +246,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "NEAR Protocol (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/10365/small/near.png",
   },
@@ -225,6 +256,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Aave (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9/logo.png",
   },
@@ -234,6 +266,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Pepe (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/29850/small/pepe-token.jpeg",
   },
@@ -243,6 +276,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Internet Computer (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/14495/small/Internet_Computer_logo.png",
   },
@@ -252,6 +286,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Ondo (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xfAbA6f8e4a5E8Ab82F62fe7C39859FA577269BE3/logo.png",
   },
@@ -261,6 +296,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Algorand (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/4380/small/download.png",
   },
@@ -270,17 +306,9 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Render (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/11636/small/rndr.png",
-  },
-  {
-    address: "0x7077C71B4AF70737a08287E279B717Dcf64fdC57",
-    symbol: "uPOLL",
-    name: "PoolTogether",
-    decimals: 18,
-    chainId: 480,
-    logoURI:
-      "https://storage.googleapis.com/zapper-fi-assets/tokens/worldchain/0x7077c71b4af70737a08287e279b717dcf64fdc57.png",
   },
   {
     address: "0x893ADcbdC7FcfA0eBb6d3803f01Df1eC199Bf7C5",
@@ -288,6 +316,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Quant (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/3370/small/5ZOu7brX_400x400.jpg",
   },
@@ -297,6 +326,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Cosmos (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png",
   },
@@ -306,6 +336,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Aptos (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/26455/small/aptos_round.png",
   },
@@ -315,6 +346,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Filecoin (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/12817/small/filecoin.png",
   },
@@ -324,6 +356,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Arbitrum (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg",
   },
@@ -333,6 +366,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Flare (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://coin-images.coingecko.com/coins/images/28624/large/FLR-icon200x200.png?1696527609",
   },
@@ -342,6 +376,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "TRUMP (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://coin-images.coingecko.com/coins/images/53746/large/trump.png?1737171561",
   },
@@ -351,16 +386,8 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Pump (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI: "",
-  },
-  {
-    address: "0xf56Ce53561a9cc084e094952232bBfE1e5fb599e",
-    symbol: "uBONK",
-    name: "Bonk (Universal)",
-    decimals: 18,
-    chainId: 480,
-    logoURI:
-      "https://assets.coingecko.com/coins/images/28600/small/bonk.jpg",
   },
   {
     address: "0xdef3369Cb0B783a5F8Ee93aaF9674ddE53C3CE2a",
@@ -368,6 +395,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Pudgy Penguins (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://coin-images.coingecko.com/coins/images/52622/large/PUDGY_PENGUINS_PENGU_PFP.png?1733809110",
   },
@@ -377,6 +405,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Monad (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI: "",
   },
   {
@@ -385,6 +414,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Sei (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/28205/small/Sei_Logo_-_Transparent.png",
   },
@@ -394,6 +424,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Injective (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/12882/small/Secondary_Symbol.png",
   },
@@ -403,6 +434,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Optimism (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/25244/small/Optimism.png",
   },
@@ -412,6 +444,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Fartcoin (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://coin-images.coingecko.com/coins/images/50891/large/fart.jpg?1729503972",
   },
@@ -421,6 +454,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "dogwifhat (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://coin-images.coingecko.com/coins/images/33566/large/dogwifhat.jpg?1702499428",
   },
@@ -430,6 +464,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Story (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://coin-images.coingecko.com/coins/images/54035/large/Transparent_bg.png?1738075331",
   },
@@ -439,6 +474,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "1inch (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://assets.coingecko.com/coins/images/13469/small/1inch-token.png",
   },
@@ -448,6 +484,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     name: "Peanut the Squirrel (Universal)",
     decimals: 18,
     chainId: 480,
+
     logoURI:
       "https://coin-images.coingecko.com/coins/images/51301/large/Peanut_the_Squirrel.png?1734941241",
   },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ArrowUpDown, ChevronDown, AlertCircle, Check, X, Loader2 } from "lucide-react";
 import { MiniKit } from "@worldcoin/minikit-js";
 import { CHAINS } from "@/lib/chains";
@@ -8,7 +8,6 @@ import { formatAmount, parseAmount } from "@/lib/lifi";
 import { WORLD_CHAIN_TOKENS } from "@/lib/tokens";
 import {
   UNISWAP_SWAP_ROUTER,
-  WETH9,
   NATIVE_ETH,
   getBestQuote,
   applySlippage,
@@ -17,15 +16,22 @@ import {
   buildSwapCalldata,
   buildSwapToEthCalldata,
   resolveForUniswap,
-  type UniswapQuote,
 } from "@/lib/uniswap";
 import { useUniswapQuote, type UniswapQuoteResult } from "@/hooks/useUniswapQuote";
 import { isKnownRouter } from "@/lib/security";
 import ChainIcon, { TokenIcon } from "@/components/ChainIcon";
+import {
+  isUPToken,
+  getUPSymbol,
+  fetchUPQuote,
+  submitUPOrder,
+  USDC_E_ADDRESS,
+  type UPQuote,
+} from "@/lib/universal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type FlowStep = "form" | "quote-changed" | "success" | "error";
+type FlowStep = "form" | "quote-changed" | "up-review" | "success" | "error";
 
 interface TokenState {
   address: string;
@@ -408,6 +414,27 @@ export default function BridgeView({
   const [pendingFreshQuote, setPendingFreshQuote] = useState<UniswapQuoteResult | null>(null);
   const executionInFlight = useRef(false);
 
+  // Universal Protocol state
+  const [upQuote, setUpQuote] = useState<UPQuote | null>(null);
+  const [upQuoteLoading, setUpQuoteLoading] = useState(false);
+  const [upQuoteError, setUpQuoteError] = useState<string | null>(null);
+
+  // Routing: use Universal Protocol when either token is a UP-routable token
+  // (not ETH native, not core DEX tokens like WLD/WETH/WBTC)
+  const useUPRouting = useMemo(() => {
+    return isUPToken(fromToken.address) || isUPToken(toToken.address);
+  }, [fromToken.address, toToken.address]);
+
+  // For UP routing: determine order type
+  // BUY = paying USDC.e to get u-token; SELL = paying u-token to get USDC.e
+  const upOrderType = useMemo<"BUY" | "SELL" | null>(() => {
+    if (!useUPRouting) return null;
+    const fromIsUSDC = fromToken.address.toLowerCase() === USDC_E_ADDRESS.toLowerCase();
+    if (fromIsUSDC && isUPToken(toToken.address)) return "BUY";
+    if (isUPToken(fromToken.address) && toToken.address.toLowerCase() === USDC_E_ADDRESS.toLowerCase()) return "SELL";
+    return null; // e.g. uBNB → uSOL — not directly supported; show guidance
+  }, [useUPRouting, fromToken.address, toToken.address]);
+
   const {
     data: quoteResult,
     isFetching: quoteFetching,
@@ -419,6 +446,8 @@ export default function BridgeView({
     decimalsIn: fromToken.decimals,
     decimalsOut: toToken.decimals,
     fromAddress: address,
+    // Skip Uniswap quote when routing via Universal Protocol
+    enabled: !useUPRouting,
   });
 
   useEffect(() => {
@@ -429,7 +458,55 @@ export default function BridgeView({
     return () => clearInterval(id);
   }, [dataUpdatedAt]);
 
-  const toAmount = quoteResult?.amountOutFormatted ?? "";
+  // ── Universal Protocol quote fetch ───────────────────────────────────────────
+  useEffect(() => {
+    if (!useUPRouting || !upOrderType || !address || !amount || Number(amount) <= 0) {
+      setUpQuote(null);
+      setUpQuoteError(null);
+      return;
+    }
+
+    const upSymbol =
+      upOrderType === "BUY" ? getUPSymbol(toToken.address) : getUPSymbol(fromToken.address);
+    if (!upSymbol) return;
+
+    setUpQuoteLoading(true);
+    setUpQuoteError(null);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      try {
+        const amtWei = parseAmount(amount, fromToken.decimals).toString();
+        const req =
+          upOrderType === "BUY"
+            ? { type: "BUY" as const, token: upSymbol, pair_token: "USDC" as const, blockchain: "WORLD" as const, slippage_bips: 20, user_address: address, pair_token_amount: amtWei }
+            : { type: "SELL" as const, token: upSymbol, pair_token: "USDC" as const, blockchain: "WORLD" as const, slippage_bips: 20, user_address: address, token_amount: amtWei };
+        const q = await fetchUPQuote(req);
+        if (!controller.signal.aborted) setUpQuote(q);
+      } catch (e) {
+        if (!controller.signal.aborted)
+          setUpQuoteError(e instanceof Error ? e.message : "Quote unavailable");
+      } finally {
+        if (!controller.signal.aborted) setUpQuoteLoading(false);
+      }
+    }, 600); // 600ms debounce
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+      setUpQuoteLoading(false);
+    };
+  }, [useUPRouting, upOrderType, address, amount, fromToken, toToken]);
+
+  // Formatted output amount for UP route
+  const upToAmount = useMemo(() => {
+    if (!upQuote) return "";
+    const raw = upOrderType === "BUY" ? upQuote.token_amount : upQuote.pair_token_amount;
+    const decimals = upOrderType === "BUY" ? toToken.decimals : 6; // USDC.e = 6 dec
+    return formatAmount(raw, decimals);
+  }, [upQuote, upOrderType, toToken.decimals]);
+
+  const toAmount = useUPRouting ? upToAmount : (quoteResult?.amountOutFormatted ?? "");
 
   const handleFlip = () => {
     setFromToken(toToken);
@@ -437,7 +514,9 @@ export default function BridgeView({
     setAmount("");
   };
 
-  const canExecute = !!quoteResult && !quoteFetching && Number(amount) > 0 && !!address;
+  const canExecute = useUPRouting
+    ? !!upQuote && !upQuoteLoading && Number(amount) > 0 && !!address && !!upOrderType
+    : !!quoteResult && !quoteFetching && Number(amount) > 0 && !!address;
 
   // ── submitWithQuote ──────────────────────────────────────────────────────────
 
@@ -498,24 +577,30 @@ export default function BridgeView({
           chainId: WORLD_CHAIN_ID,
           transactions,
         });
-        // MiniKit v2 returns userOpHash directly on the result object
-        const hash = (res as { userOpHash?: string })?.userOpHash;
-        if (hash) {
-          setTxHash(hash);
+        // MiniKit v2: on success returns { status: "success", userOpHash, ... }
+        // On error it throws SendTransactionError — so if we reach here it succeeded.
+        // We check status to be safe; userOpHash may be "" (String(null ?? "")) on some
+        // World App versions even though the tx was submitted.
+        const result = res as { status?: string; userOpHash?: string };
+        if (result?.status === "success" || result?.userOpHash) {
+          setTxHash(result?.userOpHash ?? "");
           setStep("success");
         } else {
           setErrorMsg("Transaction was not confirmed. Please try again.");
           setStep("error");
         }
       } catch (e) {
-        const raw = e instanceof Error ? e.message : String(e);
-        // invalid_contract means the swap router isn't whitelisted yet in the
-        // World Developer Portal — surface a clear, actionable message.
-        const msg = raw === "invalid_contract"
-          ? "Swap not permitted yet. The Uniswap router must be whitelisted in the World Developer Portal under this app's permitted contracts."
-          : raw === "user_rejected"
-          ? "Swap cancelled."
-          : raw;
+        // SendTransactionError stores the code in .code ("user_rejected", "invalid_contract", etc.)
+        // and sets .message = "Transaction failed: ${code}"
+        const code = (e as { code?: string })?.code ?? "";
+        const msg =
+          code === "user_rejected"
+            ? "Swap cancelled."
+            : code === "invalid_contract"
+            ? "Swap not permitted yet. The Uniswap router must be whitelisted in the World Developer Portal under this app's permitted contracts."
+            : code
+            ? `Transaction failed: ${code}`
+            : (e instanceof Error ? e.message : "Transaction failed");
         setErrorMsg(msg);
         setStep("error");
       } finally {
@@ -526,6 +611,62 @@ export default function BridgeView({
     },
     [address, fromToken, toToken, amount],
   );
+
+  // ── executeUniversal ─────────────────────────────────────────────────────────
+
+  const executeUniversal = useCallback(async () => {
+    if (executionInFlight.current || !address || !upOrderType) return;
+    executionInFlight.current = true;
+    setIsExecuting(true);
+
+    try {
+      // 1. Get a fresh quote right before signing
+      const upSymbol =
+        upOrderType === "BUY" ? getUPSymbol(toToken.address) : getUPSymbol(fromToken.address);
+      if (!upSymbol) throw new Error("Token not supported by Universal Protocol");
+
+      const amtWei = parseAmount(amount, fromToken.decimals).toString();
+      const freshQuote = await fetchUPQuote(
+        upOrderType === "BUY"
+          ? { type: "BUY", token: upSymbol, pair_token: "USDC", blockchain: "WORLD", slippage_bips: 20, user_address: address, pair_token_amount: amtWei }
+          : { type: "SELL", token: upSymbol, pair_token: "USDC", blockchain: "WORLD", slippage_bips: 20, user_address: address, token_amount: amtWei }
+      );
+
+      // 2. Build EIP-712 typed data via universal-sdk
+      const { generateTypedData } = await import("universal-sdk");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { typedData } = await generateTypedData(freshQuote as any);
+
+      // 3. Ask user to sign (no gas) via MiniKit signTypedData
+      const signResult = await MiniKit.signTypedData({
+        ...typedData,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        types: typedData.types as any,
+        chainId: 480,
+      });
+
+      // 4. Submit signed order to Universal Protocol relayer
+      // CommandResultByVia wraps the payload — signature is at .data.signature
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const signature = (signResult as any)?.data?.signature ?? (signResult as any)?.signature ?? "";
+      const { transaction_hash } = await submitUPOrder(freshQuote, signature);
+      setTxHash(transaction_hash ?? "");
+      setStep("success");
+    } catch (e) {
+      const code = (e as { code?: string })?.code ?? "";
+      const msg =
+        code === "user_rejected"
+          ? "Swap cancelled."
+          : e instanceof Error
+          ? e.message
+          : "Swap failed";
+      setErrorMsg(msg);
+      setStep("error");
+    } finally {
+      setIsExecuting(false);
+      executionInFlight.current = false;
+    }
+  }, [address, upOrderType, fromToken, toToken, amount]);
 
   // ── execute ──────────────────────────────────────────────────────────────────
 
@@ -777,7 +918,7 @@ export default function BridgeView({
   // ── Error screen ──────────────────────────────────────────────────────────────
 
   if (step === "error") {
-    const isUserCancelled = errorMsg === "Transaction rejected.";
+    const isUserCancelled = errorMsg === "Swap cancelled.";
     const isRouteError = errorMsg.includes("quote") || errorMsg.includes("route");
     const isSafetyAbort = errorMsg.includes("Aborting for safety");
 
@@ -839,16 +980,25 @@ export default function BridgeView({
   // ── Form ──────────────────────────────────────────────────────────────────────
 
   const hasAmount = Number(amount) > 0;
-  const isFetchingRoute = quoteFetching && hasAmount && !isExecuting;
-  const isNoRoute = !quoteFetching && !quoteResult && hasAmount && !isExecuting;
+
+  // UP-specific states
+  const upUnsupportedPair = useUPRouting && !!upOrderType === false && hasAmount;
+  const isFetchingRoute = useUPRouting
+    ? upQuoteLoading && hasAmount
+    : quoteFetching && hasAmount && !isExecuting;
+  const isNoRoute = useUPRouting
+    ? (!upQuoteLoading && !upQuote && hasAmount && !isExecuting) || upUnsupportedPair
+    : !quoteFetching && !quoteResult && hasAmount && !isExecuting;
   const isNeutral = isNoRoute || !hasAmount;
 
   const ctaLabel = isExecuting
-    ? "Processing…"
+    ? "Signing…"
     : isFetchingRoute
-    ? "Finding route…"
+    ? "Getting quote…"
     : isNoRoute
-    ? "No route available"
+    ? upUnsupportedPair
+      ? "Pair via USDC.e only"
+      : "No route available"
     : canExecute
     ? `Swap ${fromSymbol} → ${toSymbol}`
     : "Enter amount";
@@ -920,7 +1070,7 @@ export default function BridgeView({
       />
 
       {/* ── Route details ───────────────────────────────────────────────── */}
-      {quoteResult && (
+      {!useUPRouting && quoteResult && (
         <RouteDetails
           result={quoteResult}
           toSymbol={toSymbol}
@@ -928,14 +1078,54 @@ export default function BridgeView({
           isFetching={quoteFetching}
         />
       )}
+      {useUPRouting && upQuote && (
+        <div
+          className="rounded-xl px-3 py-2.5"
+          style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.55)" }}>
+              Universal Protocol
+            </span>
+            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.2)" }}>
+              No gas · Relayer settles
+            </span>
+          </div>
+          {upQuote.gas_fee_dollars > 0 && (
+            <p className="text-[10px] mt-1" style={{ color: "rgba(255,255,255,0.22)" }}>
+              Network fee: ~${upQuote.gas_fee_dollars.toFixed(4)}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ── No route ────────────────────────────────────────────────────── */}
-      {isNoRoute && <NoRouteSuggestions fromToken={fromToken} />}
+      {isNoRoute && !upUnsupportedPair && <NoRouteSuggestions fromToken={fromToken} />}
+      {upUnsupportedPair && (
+        <div
+          className="rounded-xl px-4 py-3.5"
+          style={{ background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <p className="text-[12px] font-semibold mb-1" style={{ color: "rgba(255,255,255,0.45)" }}>
+            Swap via USDC.e
+          </p>
+          <p className="text-[12px] leading-snug" style={{ color: "rgba(255,255,255,0.35)" }}>
+            To swap between two Universal Protocol tokens, first swap to USDC.e, then swap to your target token.
+          </p>
+        </div>
+      )}
+
+      {/* ── UP quote error ───────────────────────────────────────────────── */}
+      {useUPRouting && upQuoteError && hasAmount && (
+        <p className="text-[11px] text-center" style={{ color: "rgba(255,100,100,0.7)" }}>
+          {upQuoteError}
+        </p>
+      )}
 
       {/* ── CTA ─────────────────────────────────────────────────────────── */}
       <div className="pt-1" />
       <button
-        onClick={execute}
+        onClick={useUPRouting ? executeUniversal : execute}
         disabled={!canExecute || isExecuting || isFetchingRoute}
         className="w-full py-[15px] rounded-2xl text-[14px] font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98]"
         style={{

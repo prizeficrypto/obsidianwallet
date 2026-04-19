@@ -1,9 +1,8 @@
 "use client";
 
-import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, ExternalLink, Clock } from "lucide-react";
-import { useTxStore } from "@/store/txStore";
-import { formatUSD, formatRelativeTime, shortenAddress } from "@/lib/format";
-import { TxStatusChip } from "@/components/ui/TxStatusChip";
+import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, ExternalLink, Clock, Loader2 } from "lucide-react";
+import { formatRelativeTime, shortenAddress } from "@/lib/format";
+import { useActivityTxs } from "@/hooks/useActivityTxs";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { Transaction, TxType } from "@/types/transaction";
 
@@ -30,17 +29,23 @@ const TX_ICON: Record<TxType, React.ReactNode> = {
 const TX_LABEL: Record<TxType, string> = {
   send:    "Sent",
   receive: "Received",
-  swap:    "Bought",
-  bridge:  "Bought",
+  swap:    "Swap",
+  bridge:  "Bridge",
   approve: "Approved",
 };
 
 function TxRow({ tx }: { tx: Transaction }) {
   const isReceive = tx.type === "receive";
+  const isSwap = tx.type === "swap" || tx.type === "bridge";
   const iconColor = TX_ICON_COLOR[tx.type];
 
   return (
-    <div className="flex items-center gap-3 px-4 py-[11px]">
+    <a
+      href={`https://worldchain-mainnet.explorer.alchemy.com/tx/${tx.hash}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 px-4 py-[11px] active:bg-white/[0.03] transition-colors"
+    >
       <div
         className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
         style={{ background: "#141414", color: iconColor }}
@@ -53,10 +58,13 @@ function TxRow({ tx }: { tx: Transaction }) {
           <p className="text-[14px] font-semibold text-white leading-none">
             {TX_LABEL[tx.type]}
           </p>
-          <TxStatusChip status={tx.status} />
         </div>
         <p className="text-[12px] mt-[5px] truncate" style={{ color: "rgba(255,255,255,0.3)", fontWeight: 400 }}>
-          {isReceive ? `from ${shortenAddress(tx.from)}` : `to ${shortenAddress(tx.to)}`}
+          {isReceive
+            ? `from ${shortenAddress(tx.from)}`
+            : isSwap
+            ? "Uniswap V3 · World Chain"
+            : `to ${shortenAddress(tx.to)}`}
           {"  ·  "}
           {formatRelativeTime(tx.timestamp)}
         </p>
@@ -65,17 +73,12 @@ function TxRow({ tx }: { tx: Transaction }) {
       <div className="text-right flex-shrink-0">
         <p
           className="text-[14px] font-semibold leading-none tabular-nums"
-          style={{ color: isReceive ? "#4ade80" : "#ffffff" }}
+          style={{ color: isReceive ? "#4ade80" : isSwap ? "#60a5fa" : "#ffffff" }}
         >
-          {isReceive ? "+" : "−"}{tx.valueFormatted}
+          {isReceive ? "+" : isSwap ? "" : "−"}{tx.valueFormatted}
         </p>
-        {tx.valueUSD !== undefined && tx.valueUSD > 0 && (
-          <p className="text-[11px] mt-[5px] tabular-nums" style={{ color: "rgba(255,255,255,0.25)", fontWeight: 400 }}>
-            {formatUSD(tx.valueUSD)}
-          </p>
-        )}
       </div>
-    </div>
+    </a>
   );
 }
 
@@ -100,9 +103,37 @@ function Divider() {
   return <div className="mx-4" style={{ height: 1, background: "rgba(255,255,255,0.04)" }} />;
 }
 
+// Group txs by date label
+function groupByDate(txs: Transaction[]): { label: string; txs: Transaction[] }[] {
+  const groups: Map<string, Transaction[]> = new Map();
+  const now = Date.now();
+  const dayMs = 86_400_000;
+
+  for (const tx of txs) {
+    const diff = now - tx.timestamp;
+    let label: string;
+    if (diff < dayMs) {
+      label = "Today";
+    } else if (diff < 2 * dayMs) {
+      label = "Yesterday";
+    } else if (diff < 7 * dayMs) {
+      label = "This week";
+    } else if (diff < 30 * dayMs) {
+      label = "This month";
+    } else {
+      const d = new Date(tx.timestamp);
+      label = d.toLocaleString("en-US", { month: "long", year: "numeric" });
+    }
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label)!.push(tx);
+  }
+
+  return [...groups.entries()].map(([label, txs]) => ({ label, txs }));
+}
+
 export default function ActivityScreen({ address }: ActivityScreenProps) {
-  const { pending, history } = useTxStore();
-  const allTxs = [...pending, ...history];
+  const { data: txs, isLoading } = useActivityTxs(address);
+  const grouped = txs && txs.length > 0 ? groupByDate(txs) : [];
 
   return (
     <div className="pb-4">
@@ -117,7 +148,7 @@ export default function ActivityScreen({ address }: ActivityScreenProps) {
 
         {address && (
           <a
-            href={`https://worldscan.org/address/${address}`}
+            href={`https://worldchain-mainnet.explorer.alchemy.com/address/${address}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium active:opacity-70 transition-opacity"
@@ -129,40 +160,32 @@ export default function ActivityScreen({ address }: ActivityScreenProps) {
         )}
       </div>
 
-      <div>
-        {allTxs.length === 0 ? (
-          <EmptyState
-            icon={<Clock size={22} strokeWidth={1.5} />}
-            title="No transactions yet"
-            description="Your transaction history will appear here"
-          />
-        ) : (
-          <div>
-            {pending.length > 0 && (
-              <>
-                <SectionLabel title="Pending" />
-                {pending.map((tx, i) => (
-                  <div key={tx.hash}>
-                    <TxRow tx={tx} />
-                    {i < pending.length - 1 && <Divider />}
-                  </div>
-                ))}
-              </>
-            )}
-            {history.length > 0 && (
-              <>
-                <SectionLabel title="History" />
-                {history.map((tx, i) => (
-                  <div key={tx.hash}>
-                    <TxRow tx={tx} />
-                    {i < history.length - 1 && <Divider />}
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        )}
-      </div>
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <Loader2 size={20} className="animate-spin" style={{ color: "rgba(255,255,255,0.2)" }} />
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.25)" }}>Loading activity…</p>
+        </div>
+      ) : grouped.length === 0 ? (
+        <EmptyState
+          icon={<Clock size={22} strokeWidth={1.5} />}
+          title="No transactions yet"
+          description="Your transaction history will appear here"
+        />
+      ) : (
+        <div>
+          {grouped.map(({ label, txs: group }) => (
+            <div key={label}>
+              <SectionLabel title={label} />
+              {group.map((tx, i) => (
+                <div key={tx.hash}>
+                  <TxRow tx={tx} />
+                  {i < group.length - 1 && <Divider />}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createPublicClient, http } from "viem";
-import { SEARCH_TOKENS } from "@/lib/searchTokens";
+import { ALL_TOKENS } from "@/lib/searchTokens";
 import type { PriceMap } from "@/lib/prices";
 
 const BALANCE_OF_ABI = [
@@ -68,7 +68,7 @@ export function useWorldChainTokenBalances(
 
       // Exclude WLD — it's tracked separately by useWldBalance to avoid duplication
       const WLD_ADDRESS = "0x2cFc85d8E48F8EAB294be644d9E25C3030863003".toLowerCase();
-      const tokens = SEARCH_TOKENS.filter(t => t.contractAddress.toLowerCase() !== WLD_ADDRESS);
+      const tokens = ALL_TOKENS.filter(t => t.contractAddress.toLowerCase() !== WLD_ADDRESS);
 
       const contracts = tokens.map((token) => ({
         address: token.contractAddress as `0x${string}`,

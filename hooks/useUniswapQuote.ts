@@ -26,6 +26,8 @@ export interface UniswapQuoteParams {
   decimalsIn: number;
   decimalsOut: number;
   fromAddress: string | null;
+  /** Set false to skip the Uniswap quote (e.g. when routing via Universal Protocol) */
+  enabled?: boolean;
 }
 
 export function useUniswapQuote(params: UniswapQuoteParams) {
@@ -42,6 +44,7 @@ export function useUniswapQuote(params: UniswapQuoteParams) {
       amountInWei.toString(),
     ],
     enabled:
+      (params.enabled !== false) &&
       !!params.fromAddress &&
       amountInWei > 0n &&
       params.tokenIn.toLowerCase() !== params.tokenOut.toLowerCase(),
