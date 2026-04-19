@@ -14,6 +14,7 @@ import { usePortfolioChart, type PortfolioHolding } from "@/hooks/usePortfolioCh
 import InteractiveLineChart, { type ScrubPoint } from "@/components/InteractiveLineChart";
 import type { ChainBalance } from "@/hooks/useChainBalances";
 import type { WldBalance } from "@/hooks/useWldBalance";
+import type { ERC20Balance } from "@/hooks/useWorldChainTokenBalances";
 
 // ── Portfolio snapshot (since you last opened) ──────────────────────
 
@@ -54,6 +55,7 @@ interface PortfolioScreenProps {
   wldPriceChange: number | undefined;
   totalUSD: number;
   isLoading: boolean;
+  tokenBalances?: ERC20Balance[];
 }
 
 // ── Time ranges ─────────────────────────────────────────────────────
@@ -82,6 +84,7 @@ export default function PortfolioScreen({
   wldPriceChange,
   totalUSD,
   isLoading,
+  tokenBalances,
 }: PortfolioScreenProps) {
   const [chartDays, setChartDays] = useState<Days>(1);
   const [scrubPoint, setScrubPoint] = useState<ScrubPoint | null>(null);
@@ -141,6 +144,11 @@ export default function PortfolioScreen({
         movers.push({ symbol: b.chain.symbol, pct: b.priceChange24h, usd: b.usdValue });
       }
     }
+    for (const t of tokenBalances ?? []) {
+      if (t.balanceUSD > 0.5) {
+        movers.push({ symbol: t.symbol, pct: t.priceChange24h, usd: t.balanceUSD });
+      }
+    }
     // Deduplicate by symbol — keep highest-USD entry per symbol
     const bySymbol = new Map<string, MoverDatum>();
     for (const m of movers) {
@@ -151,7 +159,7 @@ export default function PortfolioScreen({
       .filter((m) => Math.abs(m.pct) > 0.1)
       .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))
       .slice(0, 3);
-  }, [balances, wldBalance, wldPriceChange]);
+  }, [balances, wldBalance, wldPriceChange, tokenBalances]);
 
   // Build holdings for chart
   const holdings: PortfolioHolding[] = useMemo(() => {
@@ -165,8 +173,13 @@ export default function PortfolioScreen({
         result.push({ coingeckoId: b.chain.coingeckoId, amount: b.nativeBalance });
       }
     }
+    for (const t of tokenBalances ?? []) {
+      if (t.balance > 0 && t.coingeckoId) {
+        result.push({ coingeckoId: t.coingeckoId, amount: t.balance });
+      }
+    }
     return result;
-  }, [balances, wldBalance]);
+  }, [balances, wldBalance, tokenBalances]);
 
   const { data: chartData, isLoading: chartLoading } = usePortfolioChart(holdings, chartDays);
 

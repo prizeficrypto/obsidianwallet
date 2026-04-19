@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Plus, X } from "lucide-react";
 import { useWatchlistStore, type WatchToken } from "@/store/watchlistStore";
 import { useWatchlistPrices } from "@/hooks/useWatchlistPrices";
@@ -124,7 +125,9 @@ function Divider() {
 function TokenPicker({ onClose }: { onClose: () => void }) {
   const { tokens, add, remove, has } = useWatchlistStore();
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -133,18 +136,18 @@ function TokenPicker({ onClose }: { onClose: () => void }) {
           position: "fixed",
           inset: 0,
           background: "rgba(0,0,0,0.6)",
-          zIndex: 80,
+          zIndex: 9998,
         }}
       />
 
-      {/* Sheet — outer positions full-width at bottom; inner gets animation + visual styles */}
+      {/* Sheet */}
       <div
         style={{
           position: "fixed",
           bottom: 0,
           left: 0,
           right: 0,
-          zIndex: 90,
+          zIndex: 9999,
           display: "flex",
           justifyContent: "center",
         }}
@@ -251,7 +254,8 @@ function TokenPicker({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 

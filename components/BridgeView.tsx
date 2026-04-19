@@ -614,8 +614,8 @@ export default function BridgeView({
         const amtWei = parseAmount(amount, fromToken.decimals).toString();
         const req =
           upOrderType === "BUY"
-            ? { type: "BUY" as const, token: upSymbol, pair_token: "USDC" as const, blockchain: "WORLD" as const, slippage_bips: 20, user_address: address, pair_token_amount: amtWei }
-            : { type: "SELL" as const, token: upSymbol, pair_token: "USDC" as const, blockchain: "WORLD" as const, slippage_bips: 20, user_address: address, token_amount: amtWei };
+            ? { type: "BUY" as const, token: upSymbol, pair_token: "USDC" as const, blockchain: "WORLD" as const, slippage_bips: 50, user_address: address, pair_token_amount: amtWei }
+            : { type: "SELL" as const, token: upSymbol, pair_token: "USDC" as const, blockchain: "WORLD" as const, slippage_bips: 50, user_address: address, token_amount: amtWei };
         const q = await fetchUPQuote(req);
         if (!controller.signal.aborted) setUpQuote(q);
       } catch (e) {
@@ -1029,12 +1029,14 @@ export default function BridgeView({
 
         <button
           onClick={() => { setIsExecuting(true); submitWithQuote(pendingFreshQuote); }}
-          className="w-full py-[15px] rounded-2xl text-[14px] font-semibold text-white flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+          disabled={isExecuting}
+          className="w-full py-[15px] rounded-2xl text-[14px] font-semibold text-white flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-50 disabled:pointer-events-none"
           style={{
             background: "linear-gradient(180deg, #7C6FE8 0%, #5A4FCC 100%)",
             boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
           }}
         >
+          {isExecuting && <Loader2 size={14} className="animate-spin" />}
           Accept new price and confirm
         </button>
         <button

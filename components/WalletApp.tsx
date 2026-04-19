@@ -58,8 +58,9 @@ export default function WalletApp() {
   const wldPriceUSD = prices?.["worldcoin-wld"]?.usd ?? 0;
   const { data: wldBalance } = useWldBalance(wallet.address, wldPriceUSD);
   const { data: tokenBalances } = useWorldChainTokenBalances(wallet.address, prices);
-  const tokenBalancesUSD = (tokenBalances ?? []).reduce((sum, t) => sum + t.balanceUSD, 0);
-  const totalUSD = useTotalBalance(balances) + (wldBalance?.usd ?? 0) + tokenBalancesUSD;
+  const tokenBalancesUSD = (tokenBalances ?? []).reduce((sum, t) => sum + (Number.isFinite(t.balanceUSD) ? t.balanceUSD : 0), 0);
+  const rawTotal = useTotalBalance(balances) + (wldBalance?.usd ?? 0) + tokenBalancesUSD;
+  const totalUSD = Number.isFinite(rawTotal) ? rawTotal : 0;
 
   // Held token contract addresses — used to surface user's tokens first in the swap picker
   const heldAddresses = useMemo(() => {
@@ -209,6 +210,7 @@ export default function WalletApp() {
                 wldPriceChange={prices?.["worldcoin-wld"]?.usd_24h_change}
                 totalUSD={totalUSD}
                 isLoading={isBalanceLoading}
+                tokenBalances={tokenBalances ?? undefined}
               />
             )}
 
