@@ -1,7 +1,7 @@
 export const translations = {
   en: {
     "nav.home": "Home",
-    "nav.activity": "Activity",
+    "nav.search": "Search",
     "nav.invest": "Invest",
     "nav.portfolio": "Portfolio",
 
@@ -28,7 +28,7 @@ export const translations = {
   },
   fr: {
     "nav.home": "Accueil",
-    "nav.activity": "Activité",
+    "nav.search": "Recherche",
     "nav.invest": "Investir",
     "nav.portfolio": "Portefeuille",
 
@@ -55,7 +55,7 @@ export const translations = {
   },
   es: {
     "nav.home": "Inicio",
-    "nav.activity": "Actividad",
+    "nav.search": "Buscar",
     "nav.invest": "Invertir",
     "nav.portfolio": "Portafolio",
 
@@ -82,7 +82,7 @@ export const translations = {
   },
   pt: {
     "nav.home": "Início",
-    "nav.activity": "Atividade",
+    "nav.search": "Pesquisar",
     "nav.invest": "Investir",
     "nav.portfolio": "Portfólio",
 
@@ -109,7 +109,7 @@ export const translations = {
   },
   id: {
     "nav.home": "Beranda",
-    "nav.activity": "Aktivitas",
+    "nav.search": "Cari",
     "nav.invest": "Investasi",
     "nav.portfolio": "Portofolio",
 
@@ -136,7 +136,7 @@ export const translations = {
   },
   de: {
     "nav.home": "Startseite",
-    "nav.activity": "Aktivität",
+    "nav.search": "Suchen",
     "nav.invest": "Investieren",
     "nav.portfolio": "Portfolio",
 
@@ -163,7 +163,7 @@ export const translations = {
   },
   vi: {
     "nav.home": "Trang chủ",
-    "nav.activity": "Hoạt động",
+    "nav.search": "Tìm kiếm",
     "nav.invest": "Đầu tư",
     "nav.portfolio": "Danh mục",
 
@@ -190,7 +190,7 @@ export const translations = {
   },
   it: {
     "nav.home": "Home",
-    "nav.activity": "Attività",
+    "nav.search": "Cerca",
     "nav.invest": "Investire",
     "nav.portfolio": "Portafoglio",
 

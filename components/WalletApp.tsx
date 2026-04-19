@@ -29,7 +29,7 @@ import { useReturnValue } from "@/hooks/useReturnValue";
 import { useWorldChainTokenBalances } from "@/hooks/useWorldChainTokenBalances";
 import type { SelectedToken } from "@/types/token";
 
-type NavTab = "home" | "swap" | "activity" | "portfolio" | "settings";
+type NavTab = "home" | "swap" | "activity" | "portfolio" | "settings" | "search";
 type Flow = "send" | "receive" | null;
 
 export default function WalletApp() {
@@ -165,6 +165,7 @@ export default function WalletApp() {
               isOrbVerified={wallet.isOrbVerified}
               onSettingsTap={() => setNavTab("settings")}
               onSearchTap={() => setSearchOpen(true)}
+              onActivityTap={() => setNavTab("activity")}
             />
           </div>
 
@@ -225,7 +226,10 @@ export default function WalletApp() {
             )}
 
             {navTab === "activity" && (
-              <ActivityScreen address={wallet.address} />
+              <ActivityScreen
+                address={wallet.address}
+                onBack={() => setNavTab("home")}
+              />
             )}
 
             {navTab === "portfolio" && (
@@ -246,7 +250,13 @@ export default function WalletApp() {
 
           <BottomNav
             activeTab={navTab}
-            onTabChange={(t) => setNavTab(t as NavTab)}
+            onTabChange={(t) => {
+              if (t === "search") {
+                setSearchOpen(true);
+              } else {
+                setNavTab(t as NavTab);
+              }
+            }}
           />
 
           {/* Search overlay — rendered above everything in the main layout */}

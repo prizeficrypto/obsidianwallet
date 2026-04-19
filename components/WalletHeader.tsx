@@ -1,6 +1,6 @@
 "use client";
 
-import { Settings, Search } from "lucide-react";
+import { Settings, Search, Clock } from "lucide-react";
 
 interface WalletHeaderProps {
   username: string | null;
@@ -8,9 +8,16 @@ interface WalletHeaderProps {
   isOrbVerified: boolean;
   onSettingsTap?: () => void;
   onSearchTap?: () => void;
+  onActivityTap?: () => void;
 }
 
-export default function WalletHeader({ username, isOrbVerified, onSettingsTap, onSearchTap }: WalletHeaderProps) {
+export default function WalletHeader({
+  username,
+  isOrbVerified,
+  onSettingsTap,
+  onSearchTap,
+  onActivityTap,
+}: WalletHeaderProps) {
   return (
     <header
       className="flex items-center justify-between px-5"
@@ -54,6 +61,13 @@ export default function WalletHeader({ username, isOrbVerified, onSettingsTap, o
           aria-label="Search tokens"
         >
           <Search size={16} strokeWidth={1.75} style={{ color: "rgba(255,255,255,0.45)" }} />
+        </button>
+        <button
+          onClick={onActivityTap}
+          className="w-9 h-9 flex items-center justify-center rounded-xl active:bg-white/[0.05] active:scale-90 transition-all duration-100"
+          aria-label="Activity"
+        >
+          <Clock size={16} strokeWidth={1.75} style={{ color: "rgba(255,255,255,0.45)" }} />
         </button>
         <button
           onClick={onSettingsTap}

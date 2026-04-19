@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, ExternalLink, Clock, Loader2 } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, ExternalLink, Clock, Loader2, ArrowLeft, X } from "lucide-react";
 import { formatRelativeTime, shortenAddress } from "@/lib/format";
 import { useActivityTxs } from "@/hooks/useActivityTxs";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -8,7 +8,16 @@ import type { Transaction, TxType } from "@/types/transaction";
 
 interface ActivityScreenProps {
   address: string | null;
+  onBack?: () => void;
 }
+
+const TX_ICON: Record<TxType, React.ReactNode> = {
+  send:    <ArrowUpRight   size={16} strokeWidth={1.75} />,
+  receive: <ArrowDownLeft  size={16} strokeWidth={1.75} />,
+  swap:    <ArrowLeftRight size={16} strokeWidth={1.75} />,
+  bridge:  <ArrowLeftRight size={16} strokeWidth={1.75} />,
+  approve: <ArrowUpRight   size={16} strokeWidth={1.75} />,
+};
 
 const TX_ICON_COLOR: Record<TxType, string> = {
   send:    "rgba(255,255,255,0.5)",
@@ -18,26 +27,25 @@ const TX_ICON_COLOR: Record<TxType, string> = {
   approve: "rgba(255,255,255,0.3)",
 };
 
-const TX_ICON: Record<TxType, React.ReactNode> = {
-  send:    <ArrowUpRight size={16} strokeWidth={1.75} />,
-  receive: <ArrowDownLeft size={16} strokeWidth={1.75} />,
-  swap:    <ArrowLeftRight size={16} strokeWidth={1.75} />,
-  bridge:  <ArrowLeftRight size={16} strokeWidth={1.75} />,
-  approve: <ArrowUpRight size={16} strokeWidth={1.75} />,
-};
-
-const TX_LABEL: Record<TxType, string> = {
-  send:    "Sent",
-  receive: "Received",
-  swap:    "Swap",
-  bridge:  "Bridge",
-  approve: "Approved",
-};
-
 function TxRow({ tx }: { tx: Transaction }) {
   const isReceive = tx.type === "receive";
-  const isSwap = tx.type === "swap" || tx.type === "bridge";
+  const isSwap    = tx.type === "swap" || tx.type === "bridge";
+  const isSend    = tx.type === "send";
   const iconColor = TX_ICON_COLOR[tx.type];
+
+  // Subtitle line
+  let subtitle: string;
+  if (isSwap) {
+    subtitle = "Uniswap · World Chain";
+  } else if (isReceive) {
+    subtitle = `from ${shortenAddress(tx.from)}`;
+  } else {
+    subtitle = `to ${shortenAddress(tx.to)}`;
+  }
+  subtitle += `  ·  ${formatRelativeTime(tx.timestamp)}`;
+
+  // Amount color
+  const amountColor = isReceive ? "#4ade80" : isSwap ? "#60a5fa" : "rgba(255,255,255,0.85)";
 
   return (
     <a
@@ -46,6 +54,7 @@ function TxRow({ tx }: { tx: Transaction }) {
       rel="noopener noreferrer"
       className="flex items-center gap-3 px-4 py-[11px] active:bg-white/[0.03] transition-colors"
     >
+      {/* Icon */}
       <div
         className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
         style={{ background: "#141414", color: iconColor }}
@@ -53,30 +62,47 @@ function TxRow({ tx }: { tx: Transaction }) {
         {TX_ICON[tx.type]}
       </div>
 
+      {/* Label + subtitle */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-[14px] font-semibold text-white leading-none">
-            {TX_LABEL[tx.type]}
-          </p>
-        </div>
-        <p className="text-[12px] mt-[5px] truncate" style={{ color: "rgba(255,255,255,0.3)", fontWeight: 400 }}>
-          {isReceive
-            ? `from ${shortenAddress(tx.from)}`
-            : isSwap
-            ? "Uniswap V3 · World Chain"
-            : `to ${shortenAddress(tx.to)}`}
-          {"  ·  "}
-          {formatRelativeTime(tx.timestamp)}
+        <p className="text-[14px] font-semibold text-white leading-none">
+          {isSwap    ? "Swap"     :
+           isReceive ? "Received" :
+           isSend    ? "Sent"     : "Approved"}
+        </p>
+        <p
+          className="text-[12px] mt-[5px] truncate"
+          style={{ color: "rgba(255,255,255,0.3)", fontWeight: 400 }}
+        >
+          {subtitle}
         </p>
       </div>
 
+      {/* Amount(s) */}
       <div className="text-right flex-shrink-0">
-        <p
-          className="text-[14px] font-semibold leading-none tabular-nums"
-          style={{ color: isReceive ? "#4ade80" : isSwap ? "#60a5fa" : "#ffffff" }}
-        >
-          {isReceive ? "+" : isSwap ? "" : "−"}{tx.valueFormatted}
-        </p>
+        {isSwap && tx.tokenIn ? (
+          // Two-line swap display: received on top, spent below
+          <>
+            <p
+              className="text-[14px] font-semibold leading-none tabular-nums"
+              style={{ color: amountColor }}
+            >
+              +{tx.valueFormatted}
+            </p>
+            <p
+              className="text-[11px] mt-[5px] tabular-nums"
+              style={{ color: "rgba(255,255,255,0.28)", fontWeight: 400 }}
+            >
+              −{tx.tokenIn.valueFormatted}
+            </p>
+          </>
+        ) : (
+          <p
+            className="text-[14px] font-semibold leading-none tabular-nums"
+            style={{ color: amountColor }}
+          >
+            {isReceive ? "+" : isSend ? "−" : ""}{tx.valueFormatted}
+          </p>
+        )}
       </div>
     </a>
   );
@@ -103,24 +129,19 @@ function Divider() {
   return <div className="mx-4" style={{ height: 1, background: "rgba(255,255,255,0.04)" }} />;
 }
 
-// Group txs by date label
 function groupByDate(txs: Transaction[]): { label: string; txs: Transaction[] }[] {
-  const groups: Map<string, Transaction[]> = new Map();
+  const groups = new Map<string, Transaction[]>();
   const now = Date.now();
   const dayMs = 86_400_000;
 
   for (const tx of txs) {
     const diff = now - tx.timestamp;
     let label: string;
-    if (diff < dayMs) {
-      label = "Today";
-    } else if (diff < 2 * dayMs) {
-      label = "Yesterday";
-    } else if (diff < 7 * dayMs) {
-      label = "This week";
-    } else if (diff < 30 * dayMs) {
-      label = "This month";
-    } else {
+    if (diff < dayMs)          label = "Today";
+    else if (diff < 2 * dayMs) label = "Yesterday";
+    else if (diff < 7 * dayMs) label = "This week";
+    else if (diff < 30 * dayMs) label = "This month";
+    else {
       const d = new Date(tx.timestamp);
       label = d.toLocaleString("en-US", { month: "long", year: "numeric" });
     }
@@ -131,7 +152,7 @@ function groupByDate(txs: Transaction[]): { label: string; txs: Transaction[] }[
   return [...groups.entries()].map(([label, txs]) => ({ label, txs }));
 }
 
-export default function ActivityScreen({ address }: ActivityScreenProps) {
+export default function ActivityScreen({ address, onBack }: ActivityScreenProps) {
   const { data: txs, isLoading } = useActivityTxs(address);
   const grouped = txs && txs.length > 0 ? groupByDate(txs) : [];
 
@@ -139,12 +160,23 @@ export default function ActivityScreen({ address }: ActivityScreenProps) {
     <div className="pb-4">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <h1
-          className="text-white font-bold"
-          style={{ fontSize: 20, letterSpacing: "-0.02em" }}
-        >
-          Activity
-        </h1>
+        <div className="flex items-center gap-2">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="w-8 h-8 rounded-full flex items-center justify-center active:bg-white/5 active:scale-90 transition-all duration-100 -ml-1"
+              style={{ background: "#181818" }}
+            >
+              <ArrowLeft size={16} strokeWidth={2} className="text-white/60" />
+            </button>
+          )}
+          <h1
+            className="text-white font-bold"
+            style={{ fontSize: 20, letterSpacing: "-0.02em" }}
+          >
+            Activity
+          </h1>
+        </div>
 
         {address && (
           <a

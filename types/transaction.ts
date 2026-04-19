@@ -9,12 +9,19 @@ export interface Transaction {
   from: string;
   to: string;
   value: string;                 // raw string amount
-  valueFormatted: string;
+  valueFormatted: string;        // human-readable amount received / sent
   valueUSD?: number;
   token?: {
     symbol: string;
     address: string;
     decimals: number;
+  };
+  /** For swaps: the token that was spent (the "in" side). valueFormatted holds the "out" side. */
+  tokenIn?: {
+    symbol: string;
+    address: string;
+    decimals: number;
+    valueFormatted: string;
   };
   timestamp: number;
   blockNumber?: bigint;
