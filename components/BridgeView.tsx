@@ -1361,17 +1361,15 @@ export default function BridgeView({
     (!quoteResult && !zeroExQuote && useUPRouting && upQuoteLoading && !upQuote)
   );
 
-  // True only when all routes genuinely found nothing — API errors are NOT "no route"
+  // No route when all three options are exhausted (including UP errors — if UP
+  // can't quote a token it simply has no route, regardless of the reason)
   const isNoRoute = hasAmount && !isExecuting && !isFetchingRoute && (
     !quoteResult &&
     !zeroExQuote &&
-    (!upOrderType || (!upQuoteLoading && !upQuote && !upQuoteError))
+    (!upOrderType || (!upQuoteLoading && !upQuote))
   );
 
-  const upIsRateLimited = upQuoteError === "rate_limited";
-  const upHasError = !!upQuoteError && useUPRouting;
-
-  const isNeutral = (isNoRoute && !upHasError) || !hasAmount;
+  const isNeutral = isNoRoute || !hasAmount;
 
   const ctaLabel = isExecuting
     ? "Signing…"
@@ -1381,8 +1379,6 @@ export default function BridgeView({
     ? upUnsupportedPair
       ? "Pair via USDC.e only"
       : "No route available"
-    : upHasError
-    ? "Retry quote"
     : canExecute
     ? `Swap ${fromSymbol} → ${toSymbol}`
     : "Enter amount";
@@ -1548,29 +1544,12 @@ export default function BridgeView({
         </div>
       )}
 
-      {/* ── UP quote error ───────────────────────────────────────────────── */}
-      {upHasError && hasAmount && (
-        <div
-          className="rounded-xl px-4 py-3"
-          style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.12)" }}
-        >
-          <p className="text-[12px] leading-snug" style={{ color: "rgba(248,113,113,0.8)" }}>
-            {upIsRateLimited
-              ? "Quote service is busy — tap \"Retry quote\" above to try again."
-              : upQuoteError}
-          </p>
-        </div>
-      )}
 
       {/* ── CTA ─────────────────────────────────────────────────────────── */}
       <div className="pt-1" />
       <button
-        onClick={
-          upHasError
-            ? () => { setUpQuoteError(null); setUpRetryCount(c => c + 1); }
-            : use0xRouting ? execute0x : useUPRouting ? executeUniversal : execute
-        }
-        disabled={(!canExecute && !upHasError) || isExecuting || isFetchingRoute}
+        onClick={use0xRouting ? execute0x : useUPRouting ? executeUniversal : execute}
+        disabled={!canExecute || isExecuting || isFetchingRoute}
         className="w-full py-[15px] rounded-2xl text-[14px] font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98]"
         style={{
           background: isNeutral ? "#141414" : "white",
