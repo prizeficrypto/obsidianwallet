@@ -478,8 +478,31 @@ function RouteDetails({
 
 // ── NoRouteSuggestions ────────────────────────────────────────────────────────
 
-function NoRouteSuggestions({ fromToken }: { fromToken: TokenState }) {
+function NoRouteSuggestions({
+  fromToken,
+  isUPOnlyToken,
+}: {
+  fromToken: TokenState;
+  isUPOnlyToken?: boolean;
+}) {
   const isNativeFrom = fromToken.address.toLowerCase() === NATIVE_ETH.toLowerCase();
+
+  if (isUPOnlyToken) {
+    return (
+      <div
+        className="rounded-xl px-4 py-3.5"
+        style={{ background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <p className="text-[12px] font-semibold mb-2" style={{ color: "rgba(255,255,255,0.45)" }}>
+          Use World App&apos;s built-in wallet
+        </p>
+        <p className="text-[12px] leading-snug" style={{ color: "rgba(255,255,255,0.35)" }}>
+          This is a Universal token. It can only be swapped via World App&apos;s built-in swap — open the Wallet tab in World App to sell it for USDC.e.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div
       className="rounded-xl px-4 py-3.5"
@@ -1369,6 +1392,11 @@ export default function BridgeView({
     (!upOrderType || (!upQuoteLoading && !upQuote))
   );
 
+  // UP-only token: Uniswap and 0x both have no route, and this is a UP pair.
+  // The UP API is not accessible without a developer API key, so we direct
+  // users to World App's built-in wallet instead.
+  const isUPOnlyNoRoute = isNoRoute && !!upOrderType && !upUnsupportedPair;
+
   const isNeutral = isNoRoute || !hasAmount;
 
   const ctaLabel = isExecuting
@@ -1378,6 +1406,8 @@ export default function BridgeView({
     : isNoRoute
     ? upUnsupportedPair
       ? "Pair via USDC.e only"
+      : isUPOnlyNoRoute
+      ? "Use World App wallet"
       : "No route available"
     : canExecute
     ? `Swap ${fromSymbol} → ${toSymbol}`
@@ -1529,7 +1559,9 @@ export default function BridgeView({
       )}
 
       {/* ── No route ────────────────────────────────────────────────────── */}
-      {isNoRoute && !upUnsupportedPair && <NoRouteSuggestions fromToken={fromToken} />}
+      {isNoRoute && !upUnsupportedPair && (
+        <NoRouteSuggestions fromToken={fromToken} isUPOnlyToken={isUPOnlyNoRoute} />
+      )}
       {isNoRoute && upUnsupportedPair && (
         <div
           className="rounded-xl px-4 py-3.5"
