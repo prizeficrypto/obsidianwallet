@@ -18,13 +18,8 @@ const config: Config = {
           DEFAULT: "#2a2a2a",
           subtle: "#1e1e1e",
         },
-        accent: {
-          purple: "#7C3AED",
-          "purple-light": "#9F67FF",
-          "purple-dim": "rgba(124, 58, 237, 0.15)",
-        },
         chain: {
-          world: "#7C3AED",
+          world: "#ffffff",
           eth: "#627EEA",
           sol: "#9945FF",
           bnb: "#F0B90B",

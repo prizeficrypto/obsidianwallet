@@ -113,7 +113,7 @@ export default function BalanceCard({
           right: 0,
           bottom: 0,
           background:
-            "radial-gradient(ellipse 260px 130px at 15% 30%, rgba(108,92,231,0.08) 0%, transparent 70%)",
+            "radial-gradient(ellipse 260px 130px at 15% 30%, rgba(255,255,255,0.03) 0%, transparent 70%)",
         }}
       />
 
@@ -122,7 +122,7 @@ export default function BalanceCard({
         className="absolute top-0 left-5 right-5 pointer-events-none"
         style={{
           height: 1,
-          background: `linear-gradient(90deg, transparent 0%, ${isPositive ? "rgba(74,222,128,0.25)" : "rgba(248,113,113,0.25)"} 30%, rgba(124,109,250,0.2) 70%, transparent 100%)`,
+          background: `linear-gradient(90deg, transparent 0%, ${isPositive ? "rgba(74,222,128,0.25)" : "rgba(248,113,113,0.25)"} 30%, rgba(255,255,255,0.08) 70%, transparent 100%)`,
         }}
       />
 

@@ -186,7 +186,7 @@ export default function SendModal({ address, isInWorldApp, onClose, balanceMap }
               </div>
               <span
                 className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                style={{ background: "rgba(108,92,231,0.12)", color: "rgba(108,92,231,0.7)" }}
+                style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.45)" }}
               >
                 Active
               </span>
@@ -244,7 +244,7 @@ export default function SendModal({ address, isInWorldApp, onClose, balanceMap }
                       {t.priceUSD && (
                         <p className="text-xs text-white/30">${Number(t.priceUSD).toFixed(2)}</p>
                       )}
-                      {token?.address === t.address && <Check size={13} className="text-[#9B8FFF] ml-1" />}
+                      {token?.address === t.address && <Check size={13} className="ml-1" style={{ color: "rgba(255,255,255,0.55)" }} />}
                     </button>
                   ))}
                 </div>
@@ -286,7 +286,7 @@ export default function SendModal({ address, isInWorldApp, onClose, balanceMap }
                     <button
                       onClick={() => setAmount(bal.toString())}
                       className="text-[11px] font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform"
-                      style={{ background: "rgba(124,111,232,0.18)", color: "rgba(155,140,255,0.95)" }}
+                      style={{ background: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.55)" }}
                     >
                       Max
                     </button>
@@ -359,7 +359,8 @@ export default function SendModal({ address, isInWorldApp, onClose, balanceMap }
               href={`https://worldscan.org/tx/${txHash}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-[#9B8FFF] underline underline-offset-2 success-details"
+              className="text-xs underline underline-offset-2 success-details"
+              style={{ color: "rgba(255,255,255,0.45)" }}
             >
               View on Worldscan ↗
             </a>
@@ -436,7 +437,7 @@ export default function SendModal({ address, isInWorldApp, onClose, balanceMap }
           className="px-4 pt-4"
           style={{ paddingBottom: "max(env(safe-area-inset-bottom), 20px)" }}
         >
-          <button onClick={onClose} className="w-full py-4 rounded-2xl text-sm font-semibold text-white" style={{ background: "#6C5CE7" }}>
+          <button onClick={onClose} className="w-full py-4 rounded-2xl text-sm font-semibold" style={{ background: "#ffffff", color: "#111111" }}>
             Done
           </button>
         </div>

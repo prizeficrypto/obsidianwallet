@@ -226,7 +226,7 @@ export default function TokenDetailScreen({
           <div className="flex items-center gap-2.5">
             {token.chainIconId
               ? <ChainIcon chainId={token.chainIconId} size={28} />
-              : <TokenIcon logoURI={token.logoURI} symbol={token.symbol} size={28} bg="#1A1040" />
+              : <TokenIcon logoURI={token.logoURI} symbol={token.symbol} size={28} bg="#1a1a1a" />
             }
             <div>
               <p
@@ -250,13 +250,13 @@ export default function TokenDetailScreen({
           <button
             onClick={toggleWatch}
             className="flex items-center gap-1 py-1 active:opacity-50 transition-all duration-150"
-            style={{ fontSize: 12, fontWeight: 500, color: watching ? "#6C5CE7" : "rgba(255,255,255,0.35)" }}
+            style={{ fontSize: 12, fontWeight: 500, color: watching ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)" }}
             aria-label={watching ? "Remove from watchlist" : "Add to watchlist"}
           >
             <Bookmark
               size={10}
               strokeWidth={watching ? 0 : 1.75}
-              fill={watching ? "#6C5CE7" : "none"}
+              fill={watching ? "rgba(255,255,255,0.7)" : "none"}
             />
             {watching ? "Watching" : "Watch"}
           </button>
@@ -483,7 +483,7 @@ export default function TokenDetailScreen({
                           setEditingCostBasis(false);
                         }}
                         className="px-2.5 py-1 rounded-lg text-xs font-semibold active:opacity-70 transition-opacity"
-                        style={{ background: "rgba(108,92,231,0.2)", color: "#9B8FFF" }}
+                        style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.65)" }}
                       >
                         Save
                       </button>

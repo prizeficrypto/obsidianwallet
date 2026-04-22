@@ -39,8 +39,8 @@ export default function WalletHeader({
             <span
               className="inline-flex items-center text-[9px] font-bold uppercase tracking-[0.06em] px-1.5 py-[3px] rounded"
               style={{
-                background: "rgba(124,109,250,0.12)",
-                color: "rgba(155,143,255,0.9)",
+                background: "rgba(255,255,255,0.08)",
+                color: "rgba(255,255,255,0.6)",
                 letterSpacing: "0.06em",
               }}
             >

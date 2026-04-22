@@ -178,7 +178,7 @@ function LanguagePicker({
                     {opt.name}
                   </p>
                 </div>
-                {current === opt.code && <Check size={15} strokeWidth={2.5} style={{ color: "#6C5CE7", flexShrink: 0 }} />}
+                {current === opt.code && <Check size={15} strokeWidth={2.5} style={{ color: "rgba(255,255,255,0.7)", flexShrink: 0 }} />}
               </button>
               {i < LANGUAGE_OPTIONS.length - 1 && (
                 <div style={{ height: 1, marginLeft: 68, marginRight: 20, background: "rgba(255,255,255,0.04)" }} />
@@ -331,7 +331,7 @@ export default function SettingsScreen({ wallet, onBack }: SettingsScreenProps) 
           >
             <div
               className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: "#2a2060" }}
+              style={{ background: "#2a2a2a" }}
             >
               <span className="text-white text-[13px] font-bold">
                 {wallet.username ? wallet.username.slice(0, 2).toUpperCase() : "ST"}
@@ -351,7 +351,7 @@ export default function SettingsScreen({ wallet, onBack }: SettingsScreenProps) 
             {wallet.isOrbVerified && (
               <div
                 className="flex items-center gap-1 px-2 py-[3px] rounded flex-shrink-0"
-                style={{ background: "rgba(124,109,250,0.10)", color: "rgba(155,143,255,0.85)" }}
+                style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)" }}
               >
                 <Shield size={10} strokeWidth={2} />
                 <span className="text-[10px] font-bold uppercase tracking-[0.04em]">Orb</span>

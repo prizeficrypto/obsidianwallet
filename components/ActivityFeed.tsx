@@ -20,9 +20,9 @@ export default function ActivityFeed({ address }: ActivityFeedProps) {
       >
         <div
           className="w-12 h-12 rounded-full flex items-center justify-center"
-          style={{ background: "rgba(124, 58, 237, 0.1)" }}
+          style={{ background: "rgba(255,255,255,0.06)" }}
         >
-          <Clock size={22} className="text-purple-400" />
+          <Clock size={22} style={{ color: "rgba(255,255,255,0.35)" }} />
         </div>
         <div className="text-center">
           <p className="text-white/70 font-medium text-sm">No transactions yet</p>
@@ -34,8 +34,8 @@ export default function ActivityFeed({ address }: ActivityFeedProps) {
           href={`https://worldscan.org/address/${address}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 text-xs text-purple-400 mt-1 px-3 py-1.5 rounded-full"
-          style={{ background: "rgba(124, 58, 237, 0.1)" }}
+          className="flex items-center gap-1.5 text-xs mt-1 px-3 py-1.5 rounded-full"
+          style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.45)" }}
         >
           View on Explorer
           <ExternalLink size={11} />

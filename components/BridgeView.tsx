@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { ArrowUpDown, ChevronDown, AlertCircle, Check, X, Loader2 } from "lucide-react";
 import { MiniKit } from "@worldcoin/minikit-js";
@@ -155,7 +156,7 @@ function TokenBlock({
             {t.name}
           </p>
         </div>
-        {isSelected && <Check size={13} className="text-purple-400 shrink-0" />}
+        {isSelected && <Check size={13} style={{ color: "rgba(255,255,255,0.55)", flexShrink: 0 }} />}
       </button>
     );
   }
@@ -219,7 +220,7 @@ function TokenBlock({
                         World Chain · Native
                       </p>
                     </div>
-                    {isNative && <Check size={13} className="text-purple-400 shrink-0" />}
+                    {isNative && <Check size={13} style={{ color: "rgba(255,255,255,0.55)", flexShrink: 0 }} />}
                   </button>
                 )}
 
@@ -299,7 +300,7 @@ function TokenBlock({
                   <button
                     onClick={onMax}
                     className="text-[11px] font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform"
-                    style={{ background: "rgba(124,111,232,0.18)", color: "rgba(155,140,255,0.95)" }}
+                    style={{ background: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.55)" }}
                   >
                     Max
                   </button>
@@ -600,6 +601,21 @@ export default function BridgeView({
       !STABLECOIN_SYMBOLS.has(sym)
     );
   }, [toToken.address, toToken.symbol]);
+
+  // Fetch live price for the "to" token (used in the "What you're buying" card)
+  const { data: _toTokenPriceRaw } = useQuery<Record<string, { usd: number; usd_24h_change: number }> | null>({
+    queryKey: ["invest-token-price", toTokenCgId ?? ""],
+    queryFn: async () => {
+      if (!toTokenCgId) return null;
+      const res = await fetch(`/api/prices?ids=${toTokenCgId}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!toTokenCgId && isToTokenInvestable,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+  const toTokenLivePrice = toTokenCgId ? _toTokenPriceRaw?.[toTokenCgId] ?? null : null;
 
   // ── Routing logic ─────────────────────────────────────────────────────────
   // Strategy: always try Uniswap V3 first (UP tokens may have V3 pools).
@@ -1244,7 +1260,7 @@ export default function BridgeView({
             className="w-full py-[15px] rounded-2xl text-[14px] font-semibold active:scale-[0.98] transition-transform"
             style={{ background: "white", color: "#111111" }}
           >
-            Swap again
+            Invest again
           </button>
         </div>
       </div>
@@ -1543,14 +1559,49 @@ export default function BridgeView({
           className="rounded-xl px-4 py-3.5"
           style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)" }}
         >
-          <p
-            style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase", marginBottom: 8 }}
-          >
-            What you&apos;re buying
-          </p>
-          <p style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.75)", lineHeight: 1.4, marginBottom: 8 }}>
+          {/* Token header: icon + name + live price */}
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2.5">
+              <TokenIcon logoURI={toToken.logoURI} symbol={toToken.symbol} size={28} />
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.85)", lineHeight: 1.2 }}>
+                  {toToken.name ?? toToken.symbol}
+                </p>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.28)", marginTop: 1 }}>
+                  {toToken.symbol}
+                </p>
+              </div>
+            </div>
+            {toTokenLivePrice && (
+              <div className="text-right">
+                <p style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.85)", lineHeight: 1.2 }}>
+                  {toTokenLivePrice.usd >= 1000
+                    ? `$${toTokenLivePrice.usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : toTokenLivePrice.usd >= 1
+                    ? `$${toTokenLivePrice.usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                    : `$${toTokenLivePrice.usd.toLocaleString(undefined, { maximumFractionDigits: 6 })}`}
+                </p>
+                <p style={{
+                  fontSize: 11,
+                  color: toTokenLivePrice.usd_24h_change >= 0 ? "#4ade80" : "#f87171",
+                  marginTop: 1,
+                }}>
+                  {toTokenLivePrice.usd_24h_change >= 0 ? "+" : ""}
+                  {toTokenLivePrice.usd_24h_change.toFixed(2)}% today
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Thin divider */}
+          <div style={{ height: 1, background: "rgba(255,255,255,0.05)", marginBottom: 10 }} />
+
+          {/* Description */}
+          <p style={{ fontSize: 12, lineHeight: 1.55, color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>
             {toTokenDescription.title}
           </p>
+
+          {/* Tags */}
           <div className="flex flex-wrap gap-1.5">
             {toTokenDescription.tags.map((tag) => (
               <span
@@ -1558,7 +1609,7 @@ export default function BridgeView({
                 style={{
                   fontSize: 10,
                   fontWeight: 500,
-                  color: "rgba(255,255,255,0.35)",
+                  color: "rgba(255,255,255,0.3)",
                   background: "rgba(255,255,255,0.06)",
                   borderRadius: 6,
                   padding: "3px 8px",

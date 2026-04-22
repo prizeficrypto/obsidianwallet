@@ -71,11 +71,11 @@ function LanguageStep({ onNext }: { onNext: () => void }) {
                   padding: "13px 14px",
                   borderRadius: 14,
                   background: selected
-                    ? "rgba(108,92,231,0.15)"
+                    ? "rgba(255,255,255,0.09)"
                     : "rgba(255,255,255,0.04)",
                   border: `1px solid ${
                     selected
-                      ? "rgba(108,92,231,0.5)"
+                      ? "rgba(255,255,255,0.22)"
                       : "rgba(255,255,255,0.07)"
                   }`,
                   transition: "background 0.15s, border-color 0.15s",
@@ -112,8 +112,8 @@ function LanguageStep({ onNext }: { onNext: () => void }) {
           width: "100%",
           padding: "17px 0",
           borderRadius: 16,
-          background: "#6C5CE7",
-          color: "white",
+          background: "#ffffff",
+          color: "#111111",
           fontSize: 15,
           fontWeight: 600,
           letterSpacing: "-0.015em",
@@ -203,11 +203,11 @@ function CurrencyStep({ onNext }: { onNext: () => void }) {
                   padding: "12px 14px",
                   borderRadius: 14,
                   background: selected
-                    ? "rgba(108,92,231,0.15)"
+                    ? "rgba(255,255,255,0.09)"
                     : "rgba(255,255,255,0.04)",
                   border: `1px solid ${
                     selected
-                      ? "rgba(108,92,231,0.5)"
+                      ? "rgba(255,255,255,0.22)"
                       : "rgba(255,255,255,0.07)"
                   }`,
                   transition: "background 0.15s, border-color 0.15s",
@@ -220,7 +220,7 @@ function CurrencyStep({ onNext }: { onNext: () => void }) {
                     fontSize: 15,
                     fontWeight: 600,
                     color: selected
-                      ? "rgba(108,92,231,0.9)"
+                      ? "rgba(255,255,255,0.9)"
                       : "rgba(255,255,255,0.28)",
                     minWidth: 22,
                     flexShrink: 0,
@@ -268,8 +268,8 @@ function CurrencyStep({ onNext }: { onNext: () => void }) {
           marginTop: 20,
           padding: "17px 0",
           borderRadius: 16,
-          background: "#6C5CE7",
-          color: "white",
+          background: "#ffffff",
+          color: "#111111",
           fontSize: 15,
           fontWeight: 600,
           letterSpacing: "-0.015em",
@@ -290,9 +290,9 @@ function CurrencyStep({ onNext }: { onNext: () => void }) {
 
 function AllocationArt() {
   const items = [
-    { symbol: "ETH",  usd: "$4,200", width: 196, color: "rgba(108,92,231,0.72)" },
-    { symbol: "WLD",  usd: "$3,100", width: 152, color: "rgba(108,92,231,0.44)" },
-    { symbol: "WBTC", usd: "$1,800", width: 104, color: "rgba(108,92,231,0.24)" },
+    { symbol: "ETH",  usd: "$4,200", width: 196, color: "rgba(255,255,255,0.75)" },
+    { symbol: "WLD",  usd: "$3,100", width: 152, color: "rgba(255,255,255,0.42)" },
+    { symbol: "WBTC", usd: "$1,800", width: 104, color: "rgba(255,255,255,0.2)" },
   ];
   return (
     <div style={{ width: 240 }}>
@@ -413,21 +413,21 @@ const SLIDES: Slide[] = [
     variant: "art",
     art: <AllocationArt />,
     title: "Your World Chain\nportfolio.",
-    body: "Obsidian tracks your holdings, prices, and performance. Built for World Chain — nothing else.",
+    body: "Track holdings, prices, and performance — built exclusively for World Chain.",
   },
   {
     id: "trade",
     variant: "art",
     art: <TokenRowsArt />,
-    title: "Trade any token,\ndirectly.",
-    body: "Swap across 50+ World Chain tokens at the best available rate via Uniswap V3. No bridges.",
+    title: "Invest in any\ntoken, directly.",
+    body: "Buy and sell 50+ tokens on World Chain at the best available market rate.",
   },
   {
     id: "insights",
     variant: "art",
     art: <InsightArt />,
     title: "Know what\nmoved.",
-    body: "See which holdings drove your gains or losses after every market session. One card, clearly explained.",
+    body: "After every session, see exactly what drove your portfolio — no noise, no estimates.",
   },
   {
     id: "honest",
@@ -435,8 +435,8 @@ const SLIDES: Slide[] = [
     title: "Good to\nknow.",
     points: [
       "World Chain only — this isn't a multichain wallet",
-      "Portfolio insights are based on your actual holdings",
-      "Some historical performance data may be estimated",
+      "Portfolio data is based on your actual on-chain holdings",
+      "Some historical performance figures may be estimated",
     ],
   },
 ];
@@ -456,7 +456,7 @@ function Dots({ total, current, onTap }: { total: number; current: number; onTap
             height: 5,
             width: i === current ? 20 : 5,
             borderRadius: 3,
-            background: i === current ? "#6C5CE7" : "rgba(255,255,255,0.14)",
+            background: i === current ? "#ffffff" : "rgba(255,255,255,0.2)",
             transition: "all 0.22s cubic-bezier(0.4, 0, 0.2, 1)",
             border: "none",
             padding: 0,
@@ -573,8 +573,8 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
                 marginTop: 18,
                 padding: "17px 0",
                 borderRadius: 16,
-                background: "#6C5CE7",
-                color: "white",
+                background: "#ffffff",
+                color: "#111111",
                 fontSize: 15,
                 fontWeight: 600,
                 letterSpacing: "-0.015em",
@@ -612,7 +612,7 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
                       width: 5,
                       height: 5,
                       borderRadius: "50%",
-                      background: "rgba(108,92,231,0.65)",
+                      background: "rgba(255,255,255,0.5)",
                       flexShrink: 0,
                       marginTop: 6,
                     }}
@@ -641,8 +641,8 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
                 marginTop: 18,
                 padding: "17px 0",
                 borderRadius: 16,
-                background: "#6C5CE7",
-                color: "white",
+                background: "#ffffff",
+                color: "#111111",
                 fontSize: 15,
                 fontWeight: 600,
                 letterSpacing: "-0.015em",
