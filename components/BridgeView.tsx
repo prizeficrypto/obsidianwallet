@@ -1642,179 +1642,22 @@ export default function BridgeView({
       : `Buy ${toSymbol}`
     : "Enter amount";
 
-  return (
-    <div className="px-4 pt-4 pb-6 space-y-2.5">
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between pb-2">
-        <p
-          style={{
-            fontSize: 20,
-            fontWeight: 650,
-            letterSpacing: "-0.025em",
-            color: "rgba(255,255,255,0.95)",
-          }}
-        >
-          Invest
-        </p>
-        <div
-          className="flex items-center gap-1.5 rounded-xl"
-          style={{
-            background: "#161616",
-            border: "1px solid rgba(255,255,255,0.07)",
-            padding: "5px 10px",
-          }}
-        >
-          <ChainIcon chainId="world-chain" size={13} />
-          <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.45)" }}>
-            World Chain
-          </span>
-        </div>
-      </div>
+  // Invest mode: to-token is an investable asset (not stable, not native ETH)
+  const isInvestMode = isToTokenInvestable;
 
-      {/* ── You spend ────────────────────────────────────────────────────── */}
-      <TokenBlock
-        label="You spend"
-        token={fromToken}
-        onTokenChange={(t) => { setFromToken(t); setAmount(""); }}
-        amount={amount}
-        onAmountChange={setAmount}
-        heldAddresses={heldAddresses}
-        balance={fromBalance}
-        onMax={handleMax}
-        isOpen={openPicker === "from"}
-        onOpenChange={(open) => setOpenPicker(open ? "from" : null)}
-      />
+  // Format a price for the hero display
+  function fmtHeroPrice(usd: number): string {
+    if (usd >= 10_000) return `$${usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    if (usd >= 100)    return `$${usd.toFixed(1)}`;
+    if (usd >= 1)      return `$${usd.toFixed(2)}`;
+    if (usd >= 0.01)   return `$${usd.toFixed(4)}`;
+    return `$${usd.toFixed(6)}`;
+  }
 
-      {/* ── Flip ────────────────────────────────────────────────────────── */}
-      <div className="flex items-center -my-1.5 relative z-10">
-        <div className="flex-1" style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
-        <button
-          onClick={handleFlip}
-          className="mx-3 w-9 h-9 rounded-full flex items-center justify-center active:scale-90 active:bg-white/[0.06] transition-all duration-100"
-          style={{
-            background: "#161616",
-            border: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
-          }}
-        >
-          <ArrowUpDown size={14} strokeWidth={1.75} style={{ color: "rgba(255,255,255,0.5)" }} />
-        </button>
-        <div className="flex-1" style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
-      </div>
-
-      {/* ── You get ─────────────────────────────────────────────────────── */}
-      <TokenBlock
-        label="You get"
-        token={toToken}
-        onTokenChange={setToToken}
-        amount={toAmount}
-        isReadOnly
-        isLoading={isFetchingRoute}
-        heldAddresses={heldAddresses}
-        allowedAddresses={allowedToAddresses}
-        isOpen={openPicker === "to"}
-        onOpenChange={(open) => setOpenPicker(open ? "to" : null)}
-      />
-
-      {/* ── Position strip ──────────────────────────────────────────────── */}
-      {isToTokenInvestable && hasAmount && toAmount && !isFetchingRoute && (quoteResult || use0xRouting || useUPRouting) && (
-        <PositionStrip
-          symbol={toSymbol}
-          currentBalance={balanceMap?.[toToken.address.toLowerCase()] ?? 0}
-          addedAmount={toAmount}
-          priceUSD={toTokenLivePrice?.usd ?? null}
-          totalPortfolioUSD={totalPortfolioUSD}
-        />
-      )}
-
-      {/* ── What you're buying ──────────────────────────────────────────── */}
-      {isToTokenInvestable && toTokenDescription && (
-        <div
-          className="rounded-xl px-4 py-3.5"
-          style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)" }}
-        >
-          {/* Token header: icon + name + live price */}
-          <div className="flex items-center justify-between mb-2.5">
-            <div className="flex items-center gap-2.5">
-              <TokenIcon logoURI={toToken.logoURI} symbol={toToken.symbol} size={28} />
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.85)", lineHeight: 1.2 }}>
-                  {toToken.name ?? toToken.symbol}
-                </p>
-                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.28)", marginTop: 1 }}>
-                  {toToken.symbol}
-                </p>
-              </div>
-            </div>
-            {toTokenLivePrice && (
-              <div className="text-right">
-                <p style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.85)", lineHeight: 1.2 }}>
-                  {toTokenLivePrice.usd >= 1000
-                    ? `$${toTokenLivePrice.usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                    : toTokenLivePrice.usd >= 1
-                    ? `$${toTokenLivePrice.usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                    : `$${toTokenLivePrice.usd.toLocaleString(undefined, { maximumFractionDigits: 6 })}`}
-                </p>
-                <p style={{
-                  fontSize: 11,
-                  color: toTokenLivePrice.usd_24h_change >= 0 ? "#4ade80" : "#f87171",
-                  marginTop: 1,
-                }}>
-                  {toTokenLivePrice.usd_24h_change >= 0 ? "+" : ""}
-                  {toTokenLivePrice.usd_24h_change.toFixed(2)}% today
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Thin divider */}
-          <div style={{ height: 1, background: "rgba(255,255,255,0.05)", marginBottom: 10 }} />
-
-          {/* Market cap — compact, only when available */}
-          {toTokenLivePrice?.usd_market_cap && toTokenLivePrice.usd_market_cap > 0 && (
-            <div className="flex items-center gap-1.5 mb-8px" style={{ marginBottom: 8 }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.22)", letterSpacing: "0.02em" }}>
-                Mkt cap
-              </span>
-              <span style={{ fontSize: 11, fontWeight: 500, color: "rgba(255,255,255,0.4)" }}>
-                {toTokenLivePrice.usd_market_cap >= 1e12
-                  ? `$${(toTokenLivePrice.usd_market_cap / 1e12).toFixed(2)}T`
-                  : toTokenLivePrice.usd_market_cap >= 1e9
-                  ? `$${(toTokenLivePrice.usd_market_cap / 1e9).toFixed(1)}B`
-                  : toTokenLivePrice.usd_market_cap >= 1e6
-                  ? `$${(toTokenLivePrice.usd_market_cap / 1e6).toFixed(1)}M`
-                  : `$${toTokenLivePrice.usd_market_cap.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-              </span>
-            </div>
-          )}
-
-          {/* Description */}
-          <p style={{ fontSize: 12, lineHeight: 1.55, color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>
-            {toTokenDescription.title}
-          </p>
-
-          {/* Tags */}
-          <div className="flex flex-wrap gap-1.5">
-            {toTokenDescription.tags.map((tag) => (
-              <span
-                key={tag}
-                style={{
-                  fontSize: 10,
-                  fontWeight: 500,
-                  color: "rgba(255,255,255,0.3)",
-                  background: "rgba(255,255,255,0.06)",
-                  borderRadius: 6,
-                  padding: "3px 8px",
-                }}
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Route details ───────────────────────────────────────────────── */}
+  // Shared: route + no-route + CTA section (used in both invest and non-invest layouts)
+  const routeAndCta = (
+    <>
+      {/* ── Route details ─────────────────────────────────────────────── */}
       {!useUPRouting && !use0xRouting && quoteResult && (
         <RouteDetails
           result={quoteResult}
@@ -1825,54 +1668,33 @@ export default function BridgeView({
         />
       )}
       {use0xRouting && zeroExQuote && (
-        <div
-          className="rounded-xl px-3 py-2.5"
-          style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)" }}
-        >
-          <div className="flex items-center justify-between mb-[9px]">
-            <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.55)" }}>
-              0x Protocol
-            </span>
-            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.2)" }}>
-              Best available rate
-            </span>
+        <div className="rounded-xl px-3 py-2" style={{ opacity: 0.85 }}>
+          <div className="flex items-center gap-1 mb-1.5">
+            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.22)" }}>0x Protocol</span>
+            <span style={{ color: "rgba(255,255,255,0.1)", fontSize: 10 }}>·</span>
+            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.18)" }}>Best rate</span>
           </div>
-          <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} className="mb-[9px]" />
-          <div className="space-y-[7px]">
-            <div className="flex justify-between">
-              <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.18)" }}>Slippage</span>
-              <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>0.5%</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.18)" }}>Platform fee</span>
-              <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>
-                0.5%{platformFeeDisplay ? ` · ${platformFeeDisplay}` : ""}
-              </span>
-            </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.16)" }}>0.5% slippage</span>
+            <span style={{ color: "rgba(255,255,255,0.1)", fontSize: 10 }}>·</span>
+            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.16)" }}>
+              0.5% fee{platformFeeDisplay ? ` (${platformFeeDisplay})` : ""}
+            </span>
           </div>
         </div>
       )}
       {useUPRouting && upQuote && (
-        <div
-          className="rounded-xl px-3 py-2.5"
-          style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)" }}
-        >
+        <div className="rounded-xl px-3 py-2.5" style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)" }}>
           <div className="flex items-center justify-between mb-[9px]">
-            <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.55)" }}>
-              Universal Protocol
-            </span>
-            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.2)" }}>
-              No gas · Relayer settles
-            </span>
+            <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.55)" }}>Universal Protocol</span>
+            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.2)" }}>No gas · Relayer settles</span>
           </div>
           <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} className="mb-[9px]" />
           <div className="space-y-[7px]">
             {upQuote.gas_fee_dollars > 0 && (
               <div className="flex justify-between">
                 <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.18)" }}>Network fee</span>
-                <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>
-                  ~${upQuote.gas_fee_dollars.toFixed(4)}
-                </span>
+                <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>~${upQuote.gas_fee_dollars.toFixed(4)}</span>
               </div>
             )}
             <div className="flex justify-between">
@@ -1885,26 +1707,20 @@ export default function BridgeView({
         </div>
       )}
 
-      {/* ── No route ────────────────────────────────────────────────────── */}
+      {/* ── No route ──────────────────────────────────────────────────── */}
       {isNoRoute && !upUnsupportedPair && (
         <NoRouteSuggestions fromToken={fromToken} isUPOnlyToken={isUPOnlyNoRoute} />
       )}
       {isNoRoute && upUnsupportedPair && (
-        <div
-          className="rounded-xl px-4 py-3.5"
-          style={{ background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.06)" }}
-        >
-          <p className="text-[12px] font-semibold mb-1" style={{ color: "rgba(255,255,255,0.45)" }}>
-            Route via USDC.e
-          </p>
+        <div className="rounded-xl px-4 py-3.5" style={{ background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <p className="text-[12px] font-semibold mb-1" style={{ color: "rgba(255,255,255,0.45)" }}>Route via USDC.e</p>
           <p className="text-[12px] leading-snug" style={{ color: "rgba(255,255,255,0.35)" }}>
             To invest in this token, first get USDC.e, then invest from USDC.e.
           </p>
         </div>
       )}
 
-
-      {/* ── CTA ─────────────────────────────────────────────────────────── */}
+      {/* ── CTA ───────────────────────────────────────────────────────── */}
       <div className="pt-1" />
       <button
         onClick={use0xRouting ? execute0x : useUPRouting ? executeUniversal : execute}
@@ -1923,6 +1739,296 @@ export default function BridgeView({
         )}
         {ctaLabel}
       </button>
+    </>
+  );
+
+  return (
+    <div className="px-4 pt-4 pb-6">
+      {/* ── Header ────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pb-3">
+        <p style={{ fontSize: 20, fontWeight: 650, letterSpacing: "-0.025em", color: "rgba(255,255,255,0.95)" }}>
+          Invest
+        </p>
+        <div className="flex items-center gap-1.5 rounded-xl" style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.07)", padding: "5px 10px" }}>
+          <ChainIcon chainId="world-chain" size={13} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.45)" }}>World Chain</span>
+        </div>
+      </div>
+
+      {isInvestMode ? (
+        /* ════════════════════════════════════════════════════════════════
+           INVEST MODE: token hero + focused spend input
+           ════════════════════════════════════════════════════════════════ */
+        <div className="space-y-3">
+          {/*
+            Hidden token blocks — kept in DOM for picker portal functionality.
+            The createPortal calls inside TokenBlock render to document.body
+            regardless of this container's visibility, so pickers work correctly.
+          */}
+          <div
+            aria-hidden="true"
+            style={{ position: "absolute", opacity: 0, pointerEvents: "none", height: 0, overflow: "hidden" }}
+          >
+            <TokenBlock
+              label="You spend"
+              token={fromToken}
+              onTokenChange={(t) => { setFromToken(t); setAmount(""); }}
+              amount={amount}
+              onAmountChange={setAmount}
+              heldAddresses={heldAddresses}
+              balance={fromBalance}
+              onMax={handleMax}
+              isOpen={openPicker === "from"}
+              onOpenChange={(open) => setOpenPicker(open ? "from" : null)}
+            />
+            <TokenBlock
+              label="You get"
+              token={toToken}
+              onTokenChange={setToToken}
+              amount={toAmount}
+              isReadOnly
+              isLoading={isFetchingRoute}
+              heldAddresses={heldAddresses}
+              allowedAddresses={allowedToAddresses}
+              isOpen={openPicker === "to"}
+              onOpenChange={(open) => setOpenPicker(open ? "to" : null)}
+            />
+          </div>
+
+          {/* ── Token hero ──────────────────────────────────────────────── */}
+          <div className="flex flex-col items-center pt-1 pb-3">
+            {/* Tappable: opens the "to" token picker */}
+            <button
+              onClick={() => setOpenPicker(openPicker === "to" ? null : "to")}
+              className="flex flex-col items-center gap-2 active:opacity-60 transition-opacity"
+            >
+              <TokenIcon logoURI={toToken.logoURI} symbol={toToken.symbol} size={68} />
+              <div className="flex items-center gap-1.5 mt-1">
+                <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.025em", color: "rgba(255,255,255,0.95)" }}>
+                  {toToken.name ?? toSymbol}
+                </span>
+                <ChevronDown size={14} strokeWidth={2} style={{ color: "rgba(255,255,255,0.28)", marginTop: 1 }} />
+              </div>
+              <span style={{ fontSize: 12, letterSpacing: "0.01em", color: "rgba(255,255,255,0.28)", marginTop: -3 }}>
+                {toSymbol}
+              </span>
+            </button>
+
+            {/* Live price + 24h change */}
+            {toTokenLivePrice && (() => {
+              const c = toTokenLivePrice.usd_24h_change;
+              const cColor = c >= 0 ? "#4ade80" : "#f87171";
+              return (
+                <div className="flex items-baseline gap-2 mt-4">
+                  <span
+                    className="tabular-nums"
+                    style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em", color: "rgba(255,255,255,0.92)" }}
+                  >
+                    {fmtHeroPrice(toTokenLivePrice.usd)}
+                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: cColor }}>
+                    {c >= 0 ? "+" : ""}{c.toFixed(2)}%
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "0 -2px" }} />
+
+          {/* ── Spend input card ────────────────────────────────────────── */}
+          <div
+            className="rounded-2xl"
+            style={{
+              background: "linear-gradient(160deg, #18181b 0%, #111113 100%)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03)",
+              padding: "14px 16px 15px",
+            }}
+          >
+            {/* Label + balance row */}
+            <div className="flex items-center justify-between mb-2.5">
+              <p style={{ fontSize: 11, fontWeight: 400, color: "rgba(255,255,255,0.28)" }}>
+                Amount to invest
+              </p>
+              {fromBalance !== undefined && (
+                <div className="flex items-center gap-2">
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
+                    {fromBalance.toLocaleString(undefined, { maximumFractionDigits: 6 })} {fromSymbol}
+                  </span>
+                  <button
+                    onClick={handleMax}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform"
+                    style={{ background: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.55)" }}
+                  >
+                    Max
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Amount input + from-token picker */}
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                inputMode="decimal"
+                placeholder="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="flex-1 bg-transparent font-bold text-white placeholder:text-white/[0.1] outline-none tabular-nums leading-none min-w-0"
+                style={{ fontSize: 38, letterSpacing: "-0.03em" }}
+                min="0"
+              />
+              {/* From-token picker trigger */}
+              <button
+                onClick={() => setOpenPicker(openPicker === "from" ? null : "from")}
+                className="flex items-center gap-2 py-1 active:opacity-70 transition-opacity shrink-0"
+              >
+                {fromToken.address.toLowerCase() === NATIVE_ETH.toLowerCase()
+                  ? <ChainIcon chainId="world-chain" size={24} />
+                  : <TokenIcon logoURI={fromToken.logoURI} symbol={fromToken.symbol} size={24} />
+                }
+                <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.025em", color: "rgba(255,255,255,0.92)" }}>
+                  {fromSymbol}
+                </span>
+                <ChevronDown size={9} strokeWidth={2.25} style={{ color: "rgba(255,255,255,0.18)", marginLeft: -1 }} />
+              </button>
+            </div>
+
+            {/* Estimated output — inside the spend card, below a divider */}
+            {hasAmount && !isFetchingRoute && toAmount && (quoteResult || use0xRouting || useUPRouting) && (
+              <div
+                className="flex items-center gap-1.5 mt-3 pt-2.5"
+                style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+              >
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.22)" }}>You receive</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.55)", letterSpacing: "-0.01em" }}>
+                  ~{toAmount} {toSymbol}
+                </span>
+              </div>
+            )}
+            {hasAmount && isFetchingRoute && (
+              <div
+                className="flex items-center gap-1.5 mt-3 pt-2.5"
+                style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+              >
+                <Loader2 size={10} className="animate-spin" style={{ color: "rgba(255,255,255,0.18)" }} />
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.22)" }}>Finding best price…</span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Position strip ──────────────────────────────────────────── */}
+          {hasAmount && toAmount && !isFetchingRoute && (quoteResult || use0xRouting || useUPRouting) && (
+            <PositionStrip
+              symbol={toSymbol}
+              currentBalance={balanceMap?.[toToken.address.toLowerCase()] ?? 0}
+              addedAmount={toAmount}
+              priceUSD={toTokenLivePrice?.usd ?? null}
+              totalPortfolioUSD={totalPortfolioUSD}
+            />
+          )}
+
+          {/* ── About this asset ────────────────────────────────────────── */}
+          {/* In invest mode: no price header (hero shows it). Just mkt cap + description + tags. */}
+          {toTokenDescription && (
+            <div className="rounded-xl px-4 py-3.5" style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)" }}>
+              {toTokenLivePrice?.usd_market_cap && toTokenLivePrice.usd_market_cap > 0 && (
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)" }}>
+                    Mkt cap
+                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 500, color: "rgba(255,255,255,0.35)" }}>
+                    {toTokenLivePrice.usd_market_cap >= 1e12
+                      ? `$${(toTokenLivePrice.usd_market_cap / 1e12).toFixed(2)}T`
+                      : toTokenLivePrice.usd_market_cap >= 1e9
+                      ? `$${(toTokenLivePrice.usd_market_cap / 1e9).toFixed(1)}B`
+                      : toTokenLivePrice.usd_market_cap >= 1e6
+                      ? `$${(toTokenLivePrice.usd_market_cap / 1e6).toFixed(1)}M`
+                      : `$${toTokenLivePrice.usd_market_cap.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                  </span>
+                </div>
+              )}
+              <p style={{ fontSize: 12, lineHeight: 1.55, color: "rgba(255,255,255,0.38)", marginBottom: toTokenDescription.tags.length > 0 ? 10 : 0 }}>
+                {toTokenDescription.title}
+              </p>
+              {toTokenDescription.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {toTokenDescription.tags.map((tag) => (
+                    <span key={tag} style={{ fontSize: 10, fontWeight: 500, color: "rgba(255,255,255,0.28)", background: "rgba(255,255,255,0.06)", borderRadius: 6, padding: "3px 8px" }}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Route + CTA */}
+          {routeAndCta}
+
+          {/* Sell link — unobtrusive, lets user flip to sell mode */}
+          {canExecute && (
+            <button
+              onClick={handleFlip}
+              className="w-full py-2 active:opacity-50 transition-opacity"
+              style={{ fontSize: 12, color: "rgba(255,255,255,0.22)", letterSpacing: "-0.005em" }}
+            >
+              Sell {toSymbol} instead →
+            </button>
+          )}
+        </div>
+      ) : (
+        /* ════════════════════════════════════════════════════════════════
+           NON-INVEST MODE: symmetric swap layout (sell, stable↔stable, etc.)
+           ════════════════════════════════════════════════════════════════ */
+        <div className="space-y-2.5">
+          {/* You spend */}
+          <TokenBlock
+            label="You spend"
+            token={fromToken}
+            onTokenChange={(t) => { setFromToken(t); setAmount(""); }}
+            amount={amount}
+            onAmountChange={setAmount}
+            heldAddresses={heldAddresses}
+            balance={fromBalance}
+            onMax={handleMax}
+            isOpen={openPicker === "from"}
+            onOpenChange={(open) => setOpenPicker(open ? "from" : null)}
+          />
+
+          {/* Flip */}
+          <div className="flex items-center -my-1.5 relative z-10">
+            <div className="flex-1" style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
+            <button
+              onClick={handleFlip}
+              className="mx-3 w-9 h-9 rounded-full flex items-center justify-center active:scale-90 active:bg-white/[0.06] transition-all duration-100"
+              style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }}
+            >
+              <ArrowUpDown size={14} strokeWidth={1.75} style={{ color: "rgba(255,255,255,0.5)" }} />
+            </button>
+            <div className="flex-1" style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
+          </div>
+
+          {/* You get */}
+          <TokenBlock
+            label="You get"
+            token={toToken}
+            onTokenChange={setToToken}
+            amount={toAmount}
+            isReadOnly
+            isLoading={isFetchingRoute}
+            heldAddresses={heldAddresses}
+            allowedAddresses={allowedToAddresses}
+            isOpen={openPicker === "to"}
+            onOpenChange={(open) => setOpenPicker(open ? "to" : null)}
+          />
+
+          {/* Route + CTA */}
+          {routeAndCta}
+        </div>
+      )}
     </div>
   );
 }

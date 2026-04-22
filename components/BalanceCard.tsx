@@ -199,31 +199,6 @@ export default function BalanceCard({
             )}
           </div>
 
-          {/* Since you last opened */}
-          {!hideBalances && sinceYouLeft && (
-            <div className="flex items-baseline gap-1.5 mt-1.5">
-              <span
-                className="tabular-nums"
-                style={{
-                  fontSize: 11,
-                  fontWeight: 500,
-                  color:
-                    sinceYouLeft.changeUSD >= 0
-                      ? "rgba(74,222,128,0.55)"
-                      : "rgba(248,113,113,0.55)",
-                }}
-              >
-                {sinceYouLeft.changeUSD >= 0 ? "+" : "−"}
-                {format(Math.abs(sinceYouLeft.changeUSD))}
-                {" "}
-                ({sinceYouLeft.changePct >= 0 ? "+" : ""}
-                {sinceYouLeft.changePct.toFixed(1)}%)
-              </span>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.18)" }}>
-                {sinceYouLeft.timeLabel.toLowerCase()}
-              </span>
-            </div>
-          )}
         </div>
       )}
     </div>

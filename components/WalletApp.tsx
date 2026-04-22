@@ -11,7 +11,6 @@ import WelcomeScreen, { EmptyWalletCard } from "./WelcomeScreen";
 import OnboardingScreen from "./OnboardingScreen";
 import WalletHeader from "./WalletHeader";
 import BalanceCard from "./BalanceCard";
-import SinceYouLeft from "./SinceYouLeft";
 import MoversCard from "./MoversCard";
 import WatchlistCard from "./WatchlistCard";
 import SearchModal from "./SearchModal";
@@ -188,15 +187,6 @@ export default function WalletApp() {
                     username={wallet.username}
                     sparklineData={homeChartData ?? null}
                     sinceYouLeft={sinceYouLeft}
-                  />
-                )}
-
-                {/* Return moment — what changed since last visit */}
-                {sinceYouLeft && !bannerDismissed && !isEmpty && (
-                  <SinceYouLeft
-                    data={sinceYouLeft}
-                    topMover={movers[0] ?? null}
-                    onDismiss={dismissBanner}
                   />
                 )}
 
