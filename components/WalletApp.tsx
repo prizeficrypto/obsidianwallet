@@ -253,7 +253,12 @@ export default function WalletApp() {
             )}
 
             {navTab === "swap" && (
-              <BridgeView address={wallet.address} heldAddresses={heldAddresses} balanceMap={balanceMap} />
+              <BridgeView
+                address={wallet.address}
+                heldAddresses={heldAddresses}
+                balanceMap={balanceMap}
+                totalPortfolioUSD={totalUSD}
+              />
             )}
           </main>
 

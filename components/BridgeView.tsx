@@ -419,64 +419,42 @@ function RouteDetails({
 
   return (
     <div
-      className="rounded-xl px-3 py-2.5"
+      className="rounded-xl px-3 py-2"
       style={{
-        background: "#0d0d0d",
-        border: "1px solid rgba(255,255,255,0.06)",
-        opacity: isFetching ? 0.7 : 1,
+        opacity: isFetching ? 0.6 : 1,
         transition: "opacity 0.2s",
       }}
     >
-      <div className="flex items-center justify-between mb-[9px]">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.55)" }}>
+      {/* Single compact row — route source + age */}
+      <div className="flex items-center justify-between mb-[6px]">
+        <div className="flex items-center gap-1">
+          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.22)" }}>
             Uniswap V3
           </span>
-          <span style={{ color: "rgba(255,255,255,0.15)", fontSize: 11 }}>·</span>
-          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>
-            Best available rate
+          <span style={{ color: "rgba(255,255,255,0.1)", fontSize: 10 }}>·</span>
+          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.18)" }}>
+            Best rate
           </span>
         </div>
         <span
           className="text-[10px]"
-          style={{
-            color: isStale || isFetching ? "rgba(255,180,80,0.7)" : "rgba(255,255,255,0.2)",
-          }}
+          style={{ color: isStale || isFetching ? "rgba(255,180,80,0.6)" : "rgba(255,255,255,0.15)" }}
         >
           {ageLabel}
         </span>
       </div>
 
-      <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} className="mb-[9px]" />
-
-      <div className="space-y-[7px]">
-        <div className="flex justify-between">
-          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.28)" }}>
-            Min. received
-          </span>
-          <span
-            className="text-[11px] font-medium tabular-nums"
-            style={{ color: "rgba(255,255,255,0.6)" }}
-          >
-            {result.amountOutMinFormatted} {toSymbol}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.18)" }}>
-            Slippage
-          </span>
-          <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>
-            0.5%
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.18)" }}>
-            Platform fee
-          </span>
-          <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>
-            0.5%{feeDisplay ? ` · ${feeDisplay}` : ""}
-          </span>
-        </div>
+      {/* Compact details row */}
+      <div className="flex items-center gap-3">
+        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.16)" }}>
+          Min. {result.amountOutMinFormatted} {toSymbol}
+        </span>
+        <span style={{ color: "rgba(255,255,255,0.1)", fontSize: 10 }}>·</span>
+        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.16)" }}>0.5% slippage</span>
+        <span style={{ color: "rgba(255,255,255,0.1)", fontSize: 10 }}>·</span>
+        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.16)" }}>
+          0.5% fee{feeDisplay ? ` (${feeDisplay})` : ""}
+        </span>
       </div>
     </div>
   );
@@ -539,15 +517,118 @@ function NoRouteSuggestions({
 
 // ── BridgeView ─────────────────────────────────────────────────────────────────
 
+// ── PositionStrip ─────────────────────────────────────────────────────────────
+// Shows the user's current + post-buy position. The single highest-signal
+// thing that separates "swap" from "invest" is knowing what you'll hold after.
+
+function PositionStrip({
+  symbol,
+  currentBalance,
+  addedAmount,
+  priceUSD,
+  totalPortfolioUSD,
+}: {
+  symbol: string;
+  currentBalance: number;
+  addedAmount: string;       // formatted output from quote, e.g. "2.4512"
+  priceUSD: number | null;
+  totalPortfolioUSD: number;
+}) {
+  const added = parseFloat(addedAmount) || 0;
+  if (added <= 0) return null;
+
+  const hasPosition = currentBalance > 0.0000001;
+  const after = currentBalance + added;
+  const priceOK = !!priceUSD && priceUSD > 0;
+  const currentVal = priceOK ? currentBalance * priceUSD! : null;
+  const afterVal   = priceOK ? after * priceUSD!           : null;
+  const currentPct = totalPortfolioUSD > 1 && currentVal !== null ? (currentVal / totalPortfolioUSD) * 100 : null;
+  const afterPct   = totalPortfolioUSD > 1 && afterVal   !== null ? (afterVal   / totalPortfolioUSD) * 100 : null;
+
+  function fmtTok(n: number): string {
+    if (n === 0)      return "0";
+    if (n < 0.001)    return n.toFixed(6);
+    if (n < 1)        return n.toFixed(4);
+    if (n < 10_000)   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  }
+  function fmtUSD(n: number): string {
+    if (n < 0.01) return "<$0.01";
+    if (n < 1_000) return `$${n.toFixed(2)}`;
+    if (n < 1e6)   return `$${(n / 1_000).toFixed(1)}K`;
+    return `$${(n / 1e6).toFixed(2)}M`;
+  }
+  function fmtPct(n: number): string {
+    return n < 0.1 ? `${n.toFixed(2)}%` : `${n.toFixed(1)}%`;
+  }
+
+  return (
+    <div
+      className="rounded-2xl"
+      style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)", padding: "12px 14px 13px" }}
+    >
+      {/* Section label */}
+      <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)", marginBottom: 10 }}>
+        {hasPosition ? `Your ${symbol} position` : "Position"}
+      </p>
+
+      {/* Current → After */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        {/* Left: Current */}
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", marginBottom: 4 }}>
+            {hasPosition ? "Current" : "New position"}
+          </p>
+          <p style={{ fontSize: 14, fontWeight: 500, letterSpacing: "-0.012em", color: hasPosition ? "rgba(255,255,255,0.38)" : "rgba(255,255,255,0.18)" }}>
+            {hasPosition ? `${fmtTok(currentBalance)} ${symbol}` : "—"}
+          </p>
+          {currentVal !== null && hasPosition && (
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>{fmtUSD(currentVal)}</p>
+          )}
+        </div>
+
+        {/* Arrow */}
+        <div style={{ color: "rgba(255,255,255,0.18)", fontSize: 14, paddingTop: 14, flexShrink: 0 }}>→</div>
+
+        {/* Right: After */}
+        <div style={{ flex: 1, textAlign: "right" }}>
+          <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", marginBottom: 4 }}>After this buy</p>
+          <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.012em", color: "rgba(255,255,255,0.88)" }}>
+            {fmtTok(after)} {symbol}
+          </p>
+          {afterVal !== null && (
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.42)", marginTop: 2 }}>~{fmtUSD(afterVal)}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Portfolio weight */}
+      {afterPct !== null && (
+        <div style={{ marginTop: 10, paddingTop: 9, borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>Portfolio weight</span>
+          <span style={{ fontSize: 10, fontWeight: 500, color: "rgba(255,255,255,0.38)" }}>
+            {hasPosition && currentPct !== null
+              ? `${fmtPct(currentPct)} → ${fmtPct(afterPct)}`
+              : `${fmtPct(afterPct)} of portfolio`}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BridgeView({
   address,
   heldAddresses,
   balanceMap,
+  totalPortfolioUSD = 0,
 }: {
   address: string | null;
   heldAddresses?: Set<string>;
   /** address.toLowerCase() → human-readable token balance */
   balanceMap?: Record<string, number>;
+  /** Total portfolio value in USD — used for position weight calculation */
+  totalPortfolioUSD?: number;
 }) {
   const [fromToken, setFromToken] = useState<TokenState>(nativeToken());
   const [toToken, setToToken] = useState<TokenState>(usdcToken);
@@ -561,6 +642,15 @@ export default function BridgeView({
   // Which picker is open — only one at a time
   const [openPicker, setOpenPicker] = useState<"from" | "to" | null>(null);
   const executionInFlight = useRef(false);
+
+  // Success summary — captured at transaction time so the success screen is stable
+  const [successSummary, setSuccessSummary] = useState<{
+    fromAmount: string;
+    fromSymbol: string;
+    toAmount: string;
+    toSymbol: string;
+    existingBalance: number;
+  } | null>(null);
 
   // Universal Protocol state
   const [upQuote, setUpQuote] = useState<UPQuote | null>(null);
@@ -936,6 +1026,13 @@ export default function BridgeView({
         const hash =
           payload?.transaction_id ?? payload?.userOpHash ?? r?.transaction_id ?? r?.userOpHash ?? "";
         if (isSuccess) {
+          setSuccessSummary({
+            fromAmount: amount,
+            fromSymbol: fromToken.address.toLowerCase() === NATIVE_ETH.toLowerCase() ? WORLD_CHAIN.symbol : fromToken.symbol,
+            toAmount: result.amountOutFormatted,
+            toSymbol: toToken.address.toLowerCase() === NATIVE_ETH.toLowerCase() ? WORLD_CHAIN.symbol : toToken.symbol,
+            existingBalance: balanceMap?.[toToken.address.toLowerCase()] ?? 0,
+          });
           setTxHash(hash);
           setStep("success");
         } else {
@@ -960,7 +1057,8 @@ export default function BridgeView({
         setPendingFreshQuote(null);
       }
     },
-    [address, fromToken, toToken, amount],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [address, fromToken, toToken, amount, balanceMap],
   );
 
   // ── execute0x ─────────────────────────────────────────────────────────────
@@ -1030,6 +1128,13 @@ export default function BridgeView({
       const hash = payload?.transaction_id ?? payload?.userOpHash ?? "";
 
       if (isSuccess) {
+        setSuccessSummary({
+          fromAmount: amount,
+          fromSymbol: fromToken.address.toLowerCase() === NATIVE_ETH.toLowerCase() ? WORLD_CHAIN.symbol : fromToken.symbol,
+          toAmount: formatAmount(freshQuote.buyAmount, toToken.decimals),
+          toSymbol: toToken.address.toLowerCase() === NATIVE_ETH.toLowerCase() ? WORLD_CHAIN.symbol : toToken.symbol,
+          existingBalance: balanceMap?.[toToken.address.toLowerCase()] ?? 0,
+        });
         setTxHash(hash);
         setStep("success");
       } else {
@@ -1050,7 +1155,8 @@ export default function BridgeView({
       setIsExecuting(false);
       executionInFlight.current = false;
     }
-  }, [address, fromToken, toToken, amount]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, fromToken, toToken, amount, balanceMap]);
 
   // ── executeUniversal ──────────────────────────────────────────────────────
 
@@ -1110,10 +1216,20 @@ export default function BridgeView({
         throw new Error(`Order submission failed: ${e instanceof Error ? e.message : "unknown error"}`);
       }
 
+      const receivedFormatted = upOrderType === "BUY"
+        ? formatAmount(freshQuote.token_amount, toToken.decimals)
+        : formatAmount(freshQuote.pair_token_amount, 6);
+      setSuccessSummary({
+        fromAmount: amount,
+        fromSymbol: fromToken.address.toLowerCase() === NATIVE_ETH.toLowerCase() ? WORLD_CHAIN.symbol : fromToken.symbol,
+        toAmount: receivedFormatted,
+        toSymbol: toToken.address.toLowerCase() === NATIVE_ETH.toLowerCase() ? WORLD_CHAIN.symbol : toToken.symbol,
+        existingBalance: balanceMap?.[toToken.address.toLowerCase()] ?? 0,
+      });
       setTxHash(transaction_hash ?? "");
       setStep("success");
     } catch (e) {
-      const raw = e instanceof Error ? e.message : "Swap failed";
+      const raw = e instanceof Error ? e.message : "Transaction failed";
       const msg = raw === "user_rejected" ? "Cancelled." : raw;
       setErrorMsg(msg);
       setStep("error");
@@ -1121,7 +1237,8 @@ export default function BridgeView({
       setIsExecuting(false);
       executionInFlight.current = false;
     }
-  }, [address, upOrderType, fromToken, toToken, amount, effectiveAmount]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, upOrderType, fromToken, toToken, amount, effectiveAmount, balanceMap]);
 
   // ── execute ───────────────────────────────────────────────────────────────
 
@@ -1199,70 +1316,110 @@ export default function BridgeView({
   // ── Success screen ────────────────────────────────────────────────────────
 
   if (step === "success") {
+    const s = successSummary;
+    const sToAmount = s?.toAmount ?? toAmount;
+    const sToSymbol = s?.toSymbol ?? toSymbol;
+    const sFromAmount = s?.fromAmount ?? amount;
+    const sFromSymbol = s?.fromSymbol ?? fromSymbol;
+    const sPrior = s?.existingBalance ?? 0;
+    const sAdded = parseFloat(sToAmount) || 0;
+    const sTotal = sPrior + sAdded;
+
+    function fmtSuccessTok(n: number): string {
+      if (n < 0.001)  return n.toFixed(6);
+      if (n < 1)      return n.toFixed(4);
+      if (n < 10_000) return n.toLocaleString(undefined, { maximumFractionDigits: 3 });
+      return n.toLocaleString(undefined, { maximumFractionDigits: 1 });
+    }
+
     return (
-      <div className="px-4 pt-8 pb-6">
-        <div className="flex flex-col items-center mb-7">
-          <div className="relative flex items-center justify-center mb-5">
-            <div
-              className="absolute rounded-full success-ring"
-              style={{ width: 80, height: 80, background: "rgba(34,197,94,0.07)" }}
-            />
-            <div
-              className="relative flex items-center justify-center rounded-full success-icon"
-              style={{ width: 56, height: 56, background: "rgba(34,197,94,0.14)" }}
-            >
-              <Check size={22} strokeWidth={2.5} className="text-emerald-400" />
-            </div>
-          </div>
-
-          <div className="text-center success-amount">
-            <p
-              className="text-white font-bold tabular-nums leading-none"
-              style={{ fontSize: 36, letterSpacing: "-0.03em" }}
-            >
-              {amount} {fromSymbol}
-            </p>
-            <p className="mt-2" style={{ fontSize: 13, fontWeight: 400, color: "rgba(255,255,255,0.38)" }}>
-              purchase confirmed · submitted to network
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-2.5 success-details">
+      <div className="px-4 pt-10 pb-6">
+        {/* ── Check + hero asset ────────────────────────────────────── */}
+        <div className="flex flex-col items-center mb-7 success-amount">
           <div
-            className="rounded-xl px-4 py-3.5"
-            style={{ background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.06)" }}
+            className="flex items-center justify-center rounded-full success-icon mb-5"
+            style={{ width: 48, height: 48, background: "rgba(34,197,94,0.12)" }}
           >
-            <div className="flex justify-between items-center">
-              <span style={{ fontSize: 12, fontWeight: 400, color: "rgba(255,255,255,0.35)" }}>
-                You receive
-              </span>
-              <span className="tabular-nums font-semibold" style={{ fontSize: 14, color: "rgba(255,255,255,0.7)" }}>
-                ~{toAmount || "—"} {toSymbol}
-              </span>
-            </div>
+            <Check size={20} strokeWidth={2.5} className="text-emerald-400" />
           </div>
 
-          {txHash && (
-            <a
-              href={`${WORLD_CHAIN.explorerUrl}/tx/${txHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1 py-1 text-[12px]"
-              style={{ fontWeight: 400, color: "rgba(255,255,255,0.22)" }}
-            >
-              View on World Chain explorer <span style={{ fontSize: 10 }}>↗</span>
-            </a>
-          )}
-
-          <button
-            onClick={() => { setStep("form"); setTxHash(""); setAmount(""); }}
-            className="w-full py-[15px] rounded-2xl text-[14px] font-semibold active:scale-[0.98] transition-transform"
-            style={{ background: "white", color: "#111111" }}
+          {/* The ASSET you bought is the hero — not what you spent */}
+          <p
+            className="text-white font-bold tabular-nums leading-none"
+            style={{ fontSize: 40, letterSpacing: "-0.04em" }}
           >
-            Invest again
-          </button>
+            {sToAmount}
+          </p>
+          <p
+            className="mt-1.5"
+            style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "rgba(255,255,255,0.55)" }}
+          >
+            {sToSymbol}
+          </p>
+          <p
+            className="mt-3"
+            style={{ fontSize: 13, fontWeight: 400, color: "rgba(255,255,255,0.28)", letterSpacing: "-0.005em" }}
+          >
+            added to your portfolio
+          </p>
         </div>
+
+        {/* ── Position summary ──────────────────────────────────────── */}
+        <div
+          className="rounded-2xl overflow-hidden mb-2.5 success-details"
+          style={{ background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          {/* Spent row */}
+          <div className="flex justify-between items-center px-4 py-3.5">
+            <span style={{ fontSize: 12, fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>Spent</span>
+            <span className="tabular-nums" style={{ fontSize: 14, fontWeight: 500, color: "rgba(255,255,255,0.6)" }}>
+              {sFromAmount} {sFromSymbol}
+            </span>
+          </div>
+          {/* New total position */}
+          {sTotal > 0.0000001 && (
+            <div
+              className="flex justify-between items-center px-4 py-3.5"
+              style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>
+                {sPrior > 0.0000001 ? `Total ${sToSymbol}` : `Your ${sToSymbol}`}
+              </span>
+              <span className="tabular-nums" style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.75)" }}>
+                ~{fmtSuccessTok(sTotal)} {sToSymbol}
+              </span>
+            </div>
+          )}
+          {/* Pending note */}
+          <div
+            className="px-4 py-2.5"
+            style={{ borderTop: "1px solid rgba(255,255,255,0.04)", background: "rgba(255,255,255,0.015)" }}
+          >
+            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.18)", letterSpacing: "-0.005em" }}>
+              Transaction submitted · balance updates in ~15s
+            </p>
+          </div>
+        </div>
+
+        {txHash && (
+          <a
+            href={`${WORLD_CHAIN.explorerUrl}/tx/${txHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1 py-2 text-[12px]"
+            style={{ fontWeight: 400, color: "rgba(255,255,255,0.2)" }}
+          >
+            View on explorer <span style={{ fontSize: 10 }}>↗</span>
+          </a>
+        )}
+
+        <button
+          onClick={() => { setStep("form"); setTxHash(""); setAmount(""); setSuccessSummary(null); }}
+          className="w-full py-[15px] rounded-2xl text-[14px] font-semibold active:scale-[0.98] transition-transform mt-2"
+          style={{ background: "white", color: "#111111" }}
+        >
+          Invest again
+        </button>
       </div>
     );
   }
@@ -1463,6 +1620,10 @@ export default function BridgeView({
   const isToStable = STABLECOIN_SYMBOLS.has(toSymbol);
   const isFromStable = STABLECOIN_SYMBOLS.has(fromSymbol);
 
+  // Does the user already hold the "to" token?
+  const hasExistingToPosition = (balanceMap?.[toToken.address.toLowerCase()] ?? 0) > 0.0000001;
+  const isBuyingAsset = isFromStable || isFromNativeToken; // spending stable/native to buy an asset
+
   const ctaLabel = isExecuting
     ? "Confirming…"
     : isFetchingRoute
@@ -1472,7 +1633,9 @@ export default function BridgeView({
       ? "Pair via USDC.e only"
       : "No route found"
     : canExecute
-    ? isFromStable || isFromNativeToken
+    ? isBuyingAsset && hasExistingToPosition && isToTokenInvestable
+      ? `Add to ${toSymbol}`
+      : isFromStable || isFromNativeToken
       ? `Buy ${toSymbol}`
       : isToStable || isToNativeToken
       ? `Sell ${fromSymbol}`
@@ -1552,6 +1715,17 @@ export default function BridgeView({
         isOpen={openPicker === "to"}
         onOpenChange={(open) => setOpenPicker(open ? "to" : null)}
       />
+
+      {/* ── Position strip ──────────────────────────────────────────────── */}
+      {isToTokenInvestable && hasAmount && toAmount && !isFetchingRoute && (quoteResult || use0xRouting || useUPRouting) && (
+        <PositionStrip
+          symbol={toSymbol}
+          currentBalance={balanceMap?.[toToken.address.toLowerCase()] ?? 0}
+          addedAmount={toAmount}
+          priceUSD={toTokenLivePrice?.usd ?? null}
+          totalPortfolioUSD={totalPortfolioUSD}
+        />
+      )}
 
       {/* ── What you're buying ──────────────────────────────────────────── */}
       {isToTokenInvestable && toTokenDescription && (
