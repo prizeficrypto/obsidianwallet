@@ -279,7 +279,7 @@ function CurrencyPicker({
                     {CURRENCY_NAMES[c]}
                   </p>
                 </div>
-                {current === c && <Check size={15} strokeWidth={2.5} style={{ color: "#6C5CE7", flexShrink: 0 }} />}
+                {current === c && <Check size={15} strokeWidth={2.5} style={{ color: "rgba(255,255,255,0.9)", flexShrink: 0 }} />}
               </button>
               {i < CURRENCIES.length - 1 && (
                 <div style={{ height: 1, marginLeft: 68, marginRight: 20, background: "rgba(255,255,255,0.04)" }} />

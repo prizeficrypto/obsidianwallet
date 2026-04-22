@@ -27,6 +27,7 @@ import PortfolioScreen from "./screens/PortfolioScreen";
 import TokenDetailScreen from "./screens/TokenDetailScreen";
 import { useReturnValue } from "@/hooks/useReturnValue";
 import { useWorldChainTokenBalances } from "@/hooks/useWorldChainTokenBalances";
+import MarketsRail from "./MarketsRail";
 import type { SelectedToken } from "@/types/token";
 
 type NavTab = "home" | "swap" | "activity" | "portfolio" | "settings" | "search";
@@ -203,6 +204,14 @@ export default function WalletApp() {
                   onSend={() => setFlow("send")}
                   onReceive={() => setFlow("receive")}
                   onSwap={() => setNavTab("swap")}
+                />
+
+                {/* Markets — quick invest entry point */}
+                <MarketsRail
+                  prices={prices}
+                  balanceMap={balanceMap}
+                  onTokenTap={setSelectedToken}
+                  onSeeAll={() => setNavTab("swap")}
                 />
 
                 {/* Movers since last visit */}

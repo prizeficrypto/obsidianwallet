@@ -12,7 +12,7 @@ interface ActionButtonProps {
 
 const variantStyle = {
   default: { bg: "#1e1e1e", iconColor: "rgba(255,255,255,0.7)" },
-  primary: { bg: "#6C5CE7", iconColor: "white" },
+  primary: { bg: "#ffffff", iconColor: "#111111" },
   danger:  { bg: "rgba(231,76,60,0.15)", iconColor: "#E74C3C" },
 };
 

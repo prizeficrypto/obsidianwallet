@@ -58,8 +58,8 @@ function QRModal({ address, onClose }: { address: string; onClose: () => void })
         </div>
         <button
           onClick={onClose}
-          className="w-full py-4 rounded-2xl text-sm font-semibold text-white"
-          style={{ background: "#6C5CE7" }}
+          className="w-full py-4 rounded-2xl text-sm font-semibold"
+          style={{ background: "#ffffff", color: "#111111" }}
         >
           Done
         </button>

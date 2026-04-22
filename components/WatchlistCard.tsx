@@ -267,7 +267,7 @@ function TokenPicker({ onClose }: { onClose: () => void }) {
                       height: 24,
                       borderRadius: "50%",
                       border: watching ? "none" : "1.5px solid rgba(255,255,255,0.18)",
-                      background: watching ? "#6C5CE7" : "transparent",
+                      background: watching ? "rgba(255,255,255,0.18)" : "transparent",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",

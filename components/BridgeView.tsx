@@ -603,7 +603,7 @@ export default function BridgeView({
   }, [toToken.address, toToken.symbol]);
 
   // Fetch live price for the "to" token (used in the "What you're buying" card)
-  const { data: _toTokenPriceRaw } = useQuery<Record<string, { usd: number; usd_24h_change: number }> | null>({
+  const { data: _toTokenPriceRaw } = useQuery<Record<string, { usd: number; usd_24h_change: number; usd_market_cap?: number }> | null>({
     queryKey: ["invest-token-price", toTokenCgId ?? ""],
     queryFn: async () => {
       if (!toTokenCgId) return null;
@@ -946,7 +946,7 @@ export default function BridgeView({
         const code = (e as { code?: string })?.code ?? "";
         const msg =
           code === "user_rejected"
-            ? "Swap cancelled."
+            ? "Cancelled."
             : code === "invalid_contract"
             ? "Swap not permitted yet. The Uniswap router must be whitelisted in the World Developer Portal under this app's permitted contracts."
             : code
@@ -1040,7 +1040,7 @@ export default function BridgeView({
       const code = (e as { code?: string })?.code ?? "";
       const msg =
         code === "user_rejected"
-          ? "Swap cancelled."
+          ? "Cancelled."
           : code
           ? `Transaction failed: ${code}`
           : (e instanceof Error ? e.message : "Transaction failed");
@@ -1114,7 +1114,7 @@ export default function BridgeView({
       setStep("success");
     } catch (e) {
       const raw = e instanceof Error ? e.message : "Swap failed";
-      const msg = raw === "user_rejected" ? "Swap cancelled." : raw;
+      const msg = raw === "user_rejected" ? "Cancelled." : raw;
       setErrorMsg(msg);
       setStep("error");
     } finally {
@@ -1369,7 +1369,7 @@ export default function BridgeView({
   // ── Error screen ──────────────────────────────────────────────────────────
 
   if (step === "error") {
-    const isUserCancelled = errorMsg === "Swap cancelled.";
+    const isUserCancelled = errorMsg === "Cancelled.";
     const isRouteError = errorMsg.includes("quote") || errorMsg.includes("route");
     const isSafetyAbort = errorMsg.includes("Aborting for safety");
 
@@ -1596,6 +1596,24 @@ export default function BridgeView({
           {/* Thin divider */}
           <div style={{ height: 1, background: "rgba(255,255,255,0.05)", marginBottom: 10 }} />
 
+          {/* Market cap — compact, only when available */}
+          {toTokenLivePrice?.usd_market_cap && toTokenLivePrice.usd_market_cap > 0 && (
+            <div className="flex items-center gap-1.5 mb-8px" style={{ marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.22)", letterSpacing: "0.02em" }}>
+                Mkt cap
+              </span>
+              <span style={{ fontSize: 11, fontWeight: 500, color: "rgba(255,255,255,0.4)" }}>
+                {toTokenLivePrice.usd_market_cap >= 1e12
+                  ? `$${(toTokenLivePrice.usd_market_cap / 1e12).toFixed(2)}T`
+                  : toTokenLivePrice.usd_market_cap >= 1e9
+                  ? `$${(toTokenLivePrice.usd_market_cap / 1e9).toFixed(1)}B`
+                  : toTokenLivePrice.usd_market_cap >= 1e6
+                  ? `$${(toTokenLivePrice.usd_market_cap / 1e6).toFixed(1)}M`
+                  : `$${toTokenLivePrice.usd_market_cap.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+              </span>
+            </div>
+          )}
+
           {/* Description */}
           <p style={{ fontSize: 12, lineHeight: 1.55, color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>
             {toTokenDescription.title}
@@ -1703,10 +1721,10 @@ export default function BridgeView({
           style={{ background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.06)" }}
         >
           <p className="text-[12px] font-semibold mb-1" style={{ color: "rgba(255,255,255,0.45)" }}>
-            Swap via USDC.e
+            Route via USDC.e
           </p>
           <p className="text-[12px] leading-snug" style={{ color: "rgba(255,255,255,0.35)" }}>
-            To buy this token, swap to USDC.e first, then swap USDC.e for this token.
+            To invest in this token, first get USDC.e, then invest from USDC.e.
           </p>
         </div>
       )}
