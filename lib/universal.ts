@@ -13,22 +13,13 @@
 export const USDC_E_ADDRESS = "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1";
 
 // Contract address (lowercase) → UP API symbol (no "u" prefix).
+// Only uXRP remains — it has a confirmed Uniswap V3 pool (1% fee tier) so it
+// routes via Uniswap first and only falls back to UP if needed.
+// All other UP tokens (uSOL, uDOGE, uADA, uLINK, uXLM, uSUI, uBNB, uLTC,
+// uAVAX, uHBAR, uAAVE, uPEPE, uONDO, uPUMP) have been removed from the token
+// list since they have no Uniswap/0x liquidity and the UP API requires a key.
 const UP_MAP: Record<string, string> = {
   "0x2615a94df961278dcbc41fb0a54fec5f10a693ae": "XRP",
-  "0x9b8df6e244526ab5f6e6400d331db28c8fdddb55": "SOL",
-  "0x12e96c2bfea6e835cf8dd38a5834fa61cf723736": "DOGE",
-  "0xa3a34a0d9a08ccddb6ed422ac0a28a06731335aa": "ADA",
-  "0xd403d1624daef243fbcbd4a80d8a6f36affe32b2": "LINK",
-  "0x378c326a472915d38b2d8d41e1345987835fab64": "XLM",
-  "0xb0505e5a99abd03d94a1169e638b78edfed26ea4": "SUI",
-  "0x91b1b343ac321c0579ed33854e20a98ef881cc89": "BNB",
-  "0x3eb097375fc2fc361e4a472f5e7067238c547c52": "LTC",
-  "0xd6a34b430c05ac78c24985f8abee2616bc1788cb": "AVAX",
-  "0xc79e06860aa9564f95e08fb7e5b61458d0c63898": "HBAR",
-  "0xf383074c4b993d1ccd196188d27d0ddf22ad463c": "AAVE",
-  "0xe5c436b0a34df18f1dae98af344ca5122e7d57c4": "PEPE",
-  "0x90131d95a9a5b48b6a3ee0400807248becf4b7a4": "ONDO",
-  "0x20fbd133897ef802e0235db77bb19a071e257d41": "PUMP",
 };
 
 /** Returns the UP API token symbol for a contract address, or null if not UP-routable. */
