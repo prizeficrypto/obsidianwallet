@@ -1,8 +1,6 @@
 /**
  * Curated token list for World Chain (chainId 480).
- * Includes only tokens with confirmed Uniswap V3 or 0x liquidity.
- * UP-protocol-only tokens (uSOL, uDOGE, etc.) are excluded until the UP API
- * becomes accessible without bot-detection issues.
+ * Includes tokens with confirmed Uniswap V3 liquidity (single-hop or multi-hop via WETH).
  */
 
 export interface CuratedToken {
@@ -59,7 +57,7 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     logoURI: "https://assets.coingecko.com/coins/images/10481/small/Tether_Gold.png",
   },
 
-  // ── Universal Protocol tokens (Uniswap V3 pool confirmed) ────────────────
+  // ── Universal-bridged tokens (Uniswap V3 liquidity confirmed) ───────────
   {
     address: "0x2615a94df961278DcbC41Fb0a54fEc5f10a693aE",
     symbol: "uXRP",
@@ -67,6 +65,54 @@ export const WORLD_CHAIN_TOKENS: CuratedToken[] = [
     decimals: 18,
     chainId: 480,
     logoURI: "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png",
+  },
+  {
+    address: "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55",
+    symbol: "uSOL",
+    name: "Solana (Universal)",
+    decimals: 18,
+    chainId: 480,
+    logoURI: "https://assets.coingecko.com/coins/images/4128/small/solana.png",
+  },
+  {
+    address: "0x12E96C2BFEA6E835CF8Dd38a5834fa61Cf723736",
+    symbol: "uDOGE",
+    name: "Dogecoin (Universal)",
+    decimals: 18,
+    chainId: 480,
+    logoURI: "https://assets.coingecko.com/coins/images/5/small/dogecoin.png",
+  },
+  {
+    address: "0xa3A34A0D9A08CCDDB6Ed422Ac0A28a06731335aA",
+    symbol: "uADA",
+    name: "Cardano (Universal)",
+    decimals: 18,
+    chainId: 480,
+    logoURI: "https://assets.coingecko.com/coins/images/975/small/cardano.png",
+  },
+  {
+    address: "0xd403D1624DAEF243FbcBd4A80d8A6F36afFe32b2",
+    symbol: "uLINK",
+    name: "Chainlink (Universal)",
+    decimals: 18,
+    chainId: 480,
+    logoURI: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
+  },
+  {
+    address: "0x378c326A472915d38b2D8D41e1345987835FaB64",
+    symbol: "uXLM",
+    name: "Stellar (Universal)",
+    decimals: 18,
+    chainId: 480,
+    logoURI: "https://assets.coingecko.com/coins/images/100/small/Stellar_symbol_black_RGB.png",
+  },
+  {
+    address: "0xb0505e5a99abd03d94a1169e638B78EDfEd26ea4",
+    symbol: "uSUI",
+    name: "Sui (Universal)",
+    decimals: 18,
+    chainId: 480,
+    logoURI: "https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg",
   },
 ];
 

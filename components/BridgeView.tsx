@@ -17,6 +17,7 @@ import {
   buildTransferCalldata,
   buildSwapCalldata,
   buildSwapToEthCalldata,
+  buildExactInputCalldata,
   resolveForUniswap,
 } from "@/lib/uniswap";
 import { useUniswapQuote, type UniswapQuoteResult } from "@/hooks/useUniswapQuote";
@@ -848,16 +849,24 @@ export default function BridgeView({
         });
       } else {
         const resolvedOut = resolveForUniswap(toToken.address);
+        const swapData = result.raw.path
+          ? buildExactInputCalldata({
+              path: result.raw.path,
+              recipient: address,
+              amountIn: amountInWei,
+              amountOutMinimum: amountOutMin,
+            })
+          : buildSwapCalldata({
+              tokenIn: resolvedIn,
+              tokenOut: resolvedOut,
+              fee: result.fee,
+              recipient: address,
+              amountIn: amountInWei,
+              amountOutMinimum: amountOutMin,
+            });
         transactions.push({
           to: UNISWAP_SWAP_ROUTER as `0x${string}`,
-          data: buildSwapCalldata({
-            tokenIn: resolvedIn,
-            tokenOut: resolvedOut,
-            fee: result.fee,
-            recipient: address,
-            amountIn: amountInWei,
-            amountOutMinimum: amountOutMin,
-          }),
+          data: swapData,
           value: isFromNative ? `0x${amountInWei.toString(16)}` : "0x0",
         });
       }

@@ -80,6 +80,21 @@ const QUOTER_V2_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  {
+    inputs: [
+      { name: "path", type: "bytes" },
+      { name: "amountIn", type: "uint256" },
+    ],
+    name: "quoteExactInput",
+    outputs: [
+      { name: "amountOut", type: "uint256" },
+      { name: "sqrtPriceX96AfterList", type: "uint160[]" },
+      { name: "initializedTicksCrossedList", type: "uint32[]" },
+      { name: "gasEstimate", type: "uint256" },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
 ] as const;
 
 export const SWAP_ROUTER_ABI = [
@@ -100,6 +115,24 @@ export const SWAP_ROUTER_ABI = [
       },
     ],
     name: "exactInputSingle",
+    outputs: [{ name: "amountOut", type: "uint256" }],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        components: [
+          { name: "path", type: "bytes" },
+          { name: "recipient", type: "address" },
+          { name: "amountIn", type: "uint256" },
+          { name: "amountOutMinimum", type: "uint256" },
+        ],
+        name: "params",
+        type: "tuple",
+      },
+    ],
+    name: "exactInput",
     outputs: [{ name: "amountOut", type: "uint256" }],
     stateMutability: "payable",
     type: "function",
@@ -148,6 +181,16 @@ export function applySlippage(amountOut: bigint): bigint {
   return (amountOut * (BPS_BASE - SLIPPAGE_BPS)) / BPS_BASE;
 }
 
+/** Encode a Uniswap V3 multi-hop path: [tokenA, tokenB, tokenC], [fee_AB, fee_BC] */
+export function encodePath(tokens: string[], fees: number[]): `0x${string}` {
+  let encoded = tokens[0].toLowerCase().replace("0x", "");
+  for (let i = 0; i < fees.length; i++) {
+    encoded += fees[i].toString(16).padStart(6, "0");
+    encoded += tokens[i + 1].toLowerCase().replace("0x", "");
+  }
+  return `0x${encoded}` as `0x${string}`;
+}
+
 // ── Quote ─────────────────────────────────────────────────────────────────────
 
 export interface UniswapQuote {
@@ -155,6 +198,7 @@ export interface UniswapQuote {
   fee: FeeTier;
   tokenIn: string;   // resolved (WETH9, not native)
   tokenOut: string;  // resolved (WETH9, not native)
+  path?: `0x${string}`; // set for multi-hop routes
 }
 
 async function tryFee(
@@ -184,8 +228,30 @@ async function tryFee(
   }
 }
 
+async function tryMultiHop(
+  tokenIn: string,
+  tokenOut: string,
+  amountIn: bigint,
+  fee1: FeeTier,
+  fee2: FeeTier,
+): Promise<bigint | null> {
+  try {
+    const path = encodePath([tokenIn, WETH9, tokenOut], [fee1, fee2]);
+    const { result } = await publicClient.simulateContract({
+      address: UNISWAP_QUOTER_V2 as `0x${string}`,
+      abi: QUOTER_V2_ABI,
+      functionName: "quoteExactInput",
+      args: [path, amountIn],
+    });
+    return result[0]; // amountOut
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Try all fee tiers in parallel and return the one with the best output amount.
+ * Falls back to multi-hop via WETH9 when no direct pool exists.
  * Returns null when no pool exists or the amount is zero.
  */
 export async function getBestQuote(
@@ -199,7 +265,8 @@ export async function getBestQuote(
   if (tokenIn.toLowerCase() === tokenOut.toLowerCase()) return null;
   if (amountIn <= 0n) return null;
 
-  const results = await Promise.allSettled(
+  // 1. Try single-hop first (all fee tiers in parallel)
+  const directResults = await Promise.allSettled(
     FEE_TIERS.map(async (fee) => {
       const out = await tryFee(tokenIn, tokenOut, amountIn, fee);
       return out !== null && out > 0n ? ({ amountOut: out, fee, tokenIn, tokenOut } as UniswapQuote) : null;
@@ -207,7 +274,36 @@ export async function getBestQuote(
   );
 
   let best: UniswapQuote | null = null;
-  for (const r of results) {
+  for (const r of directResults) {
+    if (r.status === "fulfilled" && r.value !== null) {
+      if (!best || r.value.amountOut > best.amountOut) best = r.value;
+    }
+  }
+
+  if (best) return best;
+
+  // 2. No direct pool — try multi-hop via WETH9 (tokenIn → WETH9 → tokenOut)
+  // Skip if either token is already WETH9 (would be circular)
+  const wethLower = WETH9.toLowerCase();
+  if (tokenIn.toLowerCase() === wethLower || tokenOut.toLowerCase() === wethLower) {
+    return null;
+  }
+
+  const hopFees: FeeTier[] = [500, 3000, 10000];
+  const multiHopResults = await Promise.allSettled(
+    hopFees.flatMap((fee1) =>
+      hopFees.map(async (fee2) => {
+        const out = await tryMultiHop(tokenIn, tokenOut, amountIn, fee1, fee2);
+        if (out !== null && out > 0n) {
+          const path = encodePath([tokenIn, WETH9, tokenOut], [fee1, fee2]);
+          return { amountOut: out, fee: fee1, tokenIn, tokenOut, path } as UniswapQuote;
+        }
+        return null;
+      }),
+    ),
+  );
+
+  for (const r of multiHopResults) {
     if (r.status === "fulfilled" && r.value !== null) {
       if (!best || r.value.amountOut > best.amountOut) best = r.value;
     }
@@ -270,6 +366,27 @@ export function buildSwapCalldata(params: {
         amountIn: params.amountIn,
         amountOutMinimum: params.amountOutMinimum,
         sqrtPriceLimitX96: 0n,
+      },
+    ],
+  });
+}
+
+/** exactInput calldata for multi-hop swaps (path-encoded route) */
+export function buildExactInputCalldata(params: {
+  path: `0x${string}`;
+  recipient: string;
+  amountIn: bigint;
+  amountOutMinimum: bigint;
+}): `0x${string}` {
+  return encodeFunctionData({
+    abi: SWAP_ROUTER_ABI,
+    functionName: "exactInput",
+    args: [
+      {
+        path: params.path,
+        recipient: params.recipient as `0x${string}`,
+        amountIn: params.amountIn,
+        amountOutMinimum: params.amountOutMinimum,
       },
     ],
   });
