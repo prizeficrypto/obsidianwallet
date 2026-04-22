@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import {
   ArrowLeft, ExternalLink, Share2,
-  ArrowUpRight, ArrowDownLeft, ArrowLeftRight,
+  ArrowUpRight, ArrowDownLeft, TrendingUp,
   Bookmark, Pencil, X,
 } from "lucide-react";
 import { useTokenMarket, useTokenChart } from "@/hooks/useTokenDetail";
@@ -78,7 +78,7 @@ function ActionBar({
   const actions = [
     { label: "Send",    icon: <ArrowUpRight   size={18} strokeWidth={1.75} />, fn: onSend    },
     { label: "Receive", icon: <ArrowDownLeft  size={18} strokeWidth={1.75} />, fn: onReceive },
-    { label: "Swap",    icon: <ArrowLeftRight size={18} strokeWidth={1.75} />, fn: onSwap    },
+    { label: "Invest",  icon: <TrendingUp     size={18} strokeWidth={1.75} />, fn: onSwap    },
   ];
 
   return (

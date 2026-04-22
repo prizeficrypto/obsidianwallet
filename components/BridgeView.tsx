@@ -7,6 +7,8 @@ import { MiniKit } from "@worldcoin/minikit-js";
 import { CHAINS } from "@/lib/chains";
 import { formatAmount, parseAmount } from "@/lib/lifi";
 import { WORLD_CHAIN_TOKENS } from "@/lib/tokens";
+import { TOKEN_DESCRIPTIONS } from "@/lib/tokenDescriptions";
+import { SEARCH_TOKENS } from "@/lib/searchTokens";
 import {
   UNISWAP_SWAP_ROUTER,
   NATIVE_ETH,
@@ -46,6 +48,8 @@ interface TokenState {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
+
+const STABLECOIN_SYMBOLS = new Set(["USDC.e", "USDC", "USDT", "DAI", "EURC"]);
 
 const WORLD_CHAIN = CHAINS.find((c) => c.id === "world-chain")!;
 const WORLD_CHAIN_ID = 480;
@@ -131,7 +135,7 @@ function TokenBlock({
     ? filteredTokens.filter((t) => !heldAddresses!.has(t.address.toLowerCase()))
     : filteredTokens;
 
-  const pickerLabel = label === "You pay" ? "Spend" : "Receive";
+  const pickerLabel = label === "You spend" ? "Spend" : "Receive";
 
   function TokenRow({ t }: { t: typeof WORLD_CHAIN_TOKENS[number] }) {
     const isSelected = !isNative && t.address.toLowerCase() === token.address.toLowerCase();
@@ -429,7 +433,7 @@ function RouteDetails({
           </span>
           <span style={{ color: "rgba(255,255,255,0.15)", fontSize: 11 }}>·</span>
           <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>
-            {result.feeLabel} pool
+            Best available rate
           </span>
         </div>
         <span
@@ -566,6 +570,36 @@ export default function BridgeView({
   // 0x Protocol state
   const [zeroExQuote, setZeroExQuote] = useState<ZeroExQuote | null>(null);
   const [zeroExLoading, setZeroExLoading] = useState(false);
+
+  // ── Token description helpers ─────────────────────────────────────────────
+
+  // Map token contract address (lowercase) → CoinGecko ID
+  const ADDRESS_TO_CG = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const t of SEARCH_TOKENS) {
+      if (t.coingeckoId) m[t.contractAddress.toLowerCase()] = t.coingeckoId;
+    }
+    return m;
+  }, []);
+
+  const toTokenCgId = useMemo(
+    () => ADDRESS_TO_CG[toToken.address.toLowerCase()] ?? null,
+    [ADDRESS_TO_CG, toToken.address]
+  );
+
+  const toTokenDescription = useMemo(
+    () => (toTokenCgId ? TOKEN_DESCRIPTIONS[toTokenCgId] ?? null : null),
+    [toTokenCgId]
+  );
+
+  const isToTokenInvestable = useMemo(() => {
+    const addr = toToken.address.toLowerCase();
+    const sym = toToken.symbol;
+    return (
+      addr !== NATIVE_ETH.toLowerCase() &&
+      !STABLECOIN_SYMBOLS.has(sym)
+    );
+  }, [toToken.address, toToken.symbol]);
 
   // ── Routing logic ─────────────────────────────────────────────────────────
   // Strategy: always try Uniswap V3 first (UP tokens may have V3 pools).
@@ -1173,7 +1207,7 @@ export default function BridgeView({
               {amount} {fromSymbol}
             </p>
             <p className="mt-2" style={{ fontSize: 13, fontWeight: 400, color: "rgba(255,255,255,0.38)" }}>
-              swap submitted · sent to network
+              purchase confirmed · submitted to network
             </p>
           </div>
         </div>
@@ -1408,18 +1442,25 @@ export default function BridgeView({
 
   const isNeutral = isNoRoute || !hasAmount;
 
+  const isToNativeToken = toToken.address.toLowerCase() === NATIVE_ETH.toLowerCase();
+  const isFromNativeToken = fromToken.address.toLowerCase() === NATIVE_ETH.toLowerCase();
+  const isToStable = STABLECOIN_SYMBOLS.has(toSymbol);
+  const isFromStable = STABLECOIN_SYMBOLS.has(fromSymbol);
+
   const ctaLabel = isExecuting
-    ? "Signing…"
+    ? "Confirming…"
     : isFetchingRoute
-    ? "Getting quote…"
+    ? "Finding best price…"
     : isNoRoute
     ? upUnsupportedPair
       ? "Pair via USDC.e only"
-      : isUPOnlyNoRoute
-      ? "Use World App wallet"
-      : "No route available"
+      : "No route found"
     : canExecute
-    ? `Swap ${fromSymbol} → ${toSymbol}`
+    ? isFromStable || isFromNativeToken
+      ? `Buy ${toSymbol}`
+      : isToStable || isToNativeToken
+      ? `Sell ${fromSymbol}`
+      : `Buy ${toSymbol}`
     : "Enter amount";
 
   return (
@@ -1434,7 +1475,7 @@ export default function BridgeView({
             color: "rgba(255,255,255,0.95)",
           }}
         >
-          Swap
+          Invest
         </p>
         <div
           className="flex items-center gap-1.5 rounded-xl"
@@ -1451,9 +1492,9 @@ export default function BridgeView({
         </div>
       </div>
 
-      {/* ── You pay ─────────────────────────────────────────────────────── */}
+      {/* ── You spend ────────────────────────────────────────────────────── */}
       <TokenBlock
-        label="You pay"
+        label="You spend"
         token={fromToken}
         onTokenChange={(t) => { setFromToken(t); setAmount(""); }}
         amount={amount}
@@ -1482,9 +1523,9 @@ export default function BridgeView({
         <div className="flex-1" style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
       </div>
 
-      {/* ── You receive ─────────────────────────────────────────────────── */}
+      {/* ── You get ─────────────────────────────────────────────────────── */}
       <TokenBlock
-        label="You receive"
+        label="You get"
         token={toToken}
         onTokenChange={setToToken}
         amount={toAmount}
@@ -1495,6 +1536,40 @@ export default function BridgeView({
         isOpen={openPicker === "to"}
         onOpenChange={(open) => setOpenPicker(open ? "to" : null)}
       />
+
+      {/* ── What you're buying ──────────────────────────────────────────── */}
+      {isToTokenInvestable && toTokenDescription && (
+        <div
+          className="rounded-xl px-4 py-3.5"
+          style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <p
+            style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase", marginBottom: 8 }}
+          >
+            What you&apos;re buying
+          </p>
+          <p style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.75)", lineHeight: 1.4, marginBottom: 8 }}>
+            {toTokenDescription.title}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {toTokenDescription.tags.map((tag) => (
+              <span
+                key={tag}
+                style={{
+                  fontSize: 10,
+                  fontWeight: 500,
+                  color: "rgba(255,255,255,0.35)",
+                  background: "rgba(255,255,255,0.06)",
+                  borderRadius: 6,
+                  padding: "3px 8px",
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Route details ───────────────────────────────────────────────── */}
       {!useUPRouting && !use0xRouting && quoteResult && (
@@ -1516,7 +1591,7 @@ export default function BridgeView({
               0x Protocol
             </span>
             <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.2)" }}>
-              Aggregated liquidity
+              Best available rate
             </span>
           </div>
           <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} className="mb-[9px]" />

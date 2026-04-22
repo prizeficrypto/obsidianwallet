@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Plus, X } from "lucide-react";
 import { useWatchlistStore, type WatchToken } from "@/store/watchlistStore";
 import { useWatchlistPrices } from "@/hooks/useWatchlistPrices";
+import { useWatchlistSparklines } from "@/hooks/useWatchlistSparklines";
 import { CURATED_WATCH_TOKENS } from "@/lib/watchlistTokens";
 import ChainIcon, { TokenIcon } from "./ChainIcon";
 import { formatPercent } from "@/lib/format";
@@ -50,6 +51,7 @@ function WatchRow({
   onRemove,
   onTap,
   formatPrice,
+  sparkline,
 }: {
   token: WatchToken;
   priceUSD: number;
@@ -57,6 +59,7 @@ function WatchRow({
   onRemove: () => void;
   onTap?: () => void;
   formatPrice: (usd: number) => string;
+  sparkline?: number[];
 }) {
   const isUp = change24h >= 0;
   const hasPct = Math.abs(change24h) >= 0.01;
@@ -78,6 +81,8 @@ function WatchRow({
             {token.name}
           </p>
         </div>
+
+        <MiniSparkline prices={sparkline ?? []} isUp={isUp} />
 
         <div className="text-right" style={{ minWidth: 72 }}>
           <p className="tabular-nums" style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.88)" }}>
@@ -117,6 +122,40 @@ function Divider() {
       className="mr-4"
       style={{ height: 1, marginLeft: 66, background: "rgba(255,255,255,0.04)" }}
     />
+  );
+}
+
+// ── MiniSparkline ──────────────────────────────────────────────────────────────
+
+function MiniSparkline({ prices, isUp }: { prices: number[]; isUp: boolean }) {
+  if (prices.length < 2) return <div style={{ width: 56 }} />;
+
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = max - min || 1;
+  const w = 56;
+  const h = 28;
+
+  const pts = prices.map((p, i) => {
+    const x = (i / (prices.length - 1)) * w;
+    const y = h - ((p - min) / range) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+
+  const color = isUp ? "#4ade80" : "#f87171";
+
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ flexShrink: 0 }}>
+      <polyline
+        points={pts.join(" ")}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.8}
+      />
+    </svg>
   );
 }
 
@@ -264,6 +303,7 @@ function TokenPicker({ onClose }: { onClose: () => void }) {
 export default function WatchlistCard({ onTokenTap }: { onTokenTap?: (token: SelectedToken) => void }) {
   const { tokens, remove } = useWatchlistStore();
   const prices = useWatchlistPrices();
+  const sparklines = useWatchlistSparklines(tokens.map((t) => t.id));
   const [pickerOpen, setPickerOpen] = useState(false);
   const { format, rate, symbol } = useCurrency();
 
@@ -357,6 +397,7 @@ export default function WatchlistCard({ onTokenTap }: { onTokenTap?: (token: Sel
               change24h={price?.change24h ?? 0}
               onRemove={() => remove(token.id)}
               formatPrice={fmtWatchPrice}
+              sparkline={sparklines[token.id]}
               onTap={() => onTokenTap?.({
                 symbol: token.symbol,
                 coingeckoId: token.id,
