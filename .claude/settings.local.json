@@ -175,7 +175,8 @@
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)[:600]\\)\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('homepage:', d.get\\('homepage'\\)\\); print\\('repository:', d.get\\('repository'\\)\\); print\\('description:', d.get\\('description'\\)\\)\")",
       "Bash(curl -sv -X OPTIONS https://app.universal.xyz/api/v1/quote -H 'Origin: https://obsidianwallet.vercel.app' -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: content-type,accept')",
-      "Bash(curl -sv --connect-timeout 5 -X POST https://api.universal.xyz/quote -H 'Content-Type: application/json' -d '{\"type\":\"SELL\",\"token\":\"PEPE\",\"pair_token\":\"USDC\",\"blockchain\":\"WORLD\",\"slippage_bips\":50,\"user_address\":\"0x0000000000000000000000000000000000000001\",\"token_amount\":\"1000000000000000000\"}')"
+      "Bash(curl -sv --connect-timeout 5 -X POST https://api.universal.xyz/quote -H 'Content-Type: application/json' -d '{\"type\":\"SELL\",\"token\":\"PEPE\",\"pair_token\":\"USDC\",\"blockchain\":\"WORLD\",\"slippage_bips\":50,\"user_address\":\"0x0000000000000000000000000000000000000001\",\"token_amount\":\"1000000000000000000\"}')",
+      "mcp__Claude_in_Chrome__tabs_context_mcp"
     ]
   }
 }

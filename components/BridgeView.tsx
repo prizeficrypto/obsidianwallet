@@ -71,15 +71,19 @@ function nativeToken(): TokenState {
   };
 }
 
+function wethToken(): TokenState {
+  const t = WORLD_CHAIN_TOKENS.find((t) => t.symbol === "WETH")!;
+  return { address: t.address, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI, name: t.name };
+}
+
 function usdcToken(): TokenState {
   const t = WORLD_CHAIN_TOKENS.find((t) => t.symbol === "USDC.e")!;
   return { address: t.address, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI, name: t.name };
 }
 
-// All DEX-routable token addresses (lowercase) — anything NOT in UP_MAP + native ETH
+// All DEX-routable token addresses (lowercase) — anything NOT in UP_MAP, no native ETH
 function buildDexAddresses(): Set<string> {
   const set = new Set<string>();
-  set.add(NATIVE_ETH.toLowerCase());
   WORLD_CHAIN_TOKENS.forEach((t) => {
     if (!isUPToken(t.address)) set.add(t.address.toLowerCase());
   });
@@ -103,6 +107,7 @@ function TokenBlock({
   onMax,
   isOpen,
   onOpenChange,
+  pickerBalanceMap,
 }: {
   token: TokenState;
   onTokenChange: (t: TokenState) => void;
@@ -118,13 +123,14 @@ function TokenBlock({
   onMax?: () => void;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  /** address.toLowerCase() → human-readable balance, shown in picker */
+  pickerBalanceMap?: Record<string, number>;
 }) {
   const isNative = token.address.toLowerCase() === NATIVE_ETH.toLowerCase();
   const displaySymbol = isNative ? WORLD_CHAIN.symbol : token.symbol;
   const displaySubtext = isNative ? "World Chain · Native" : (token.name ?? token.symbol);
 
-  // Filter token list
-  const showNative = !allowedAddresses || allowedAddresses.has(NATIVE_ETH.toLowerCase());
+  // Filter token list — native ETH is never shown (WETH is the ETH representation)
   const filteredTokens = allowedAddresses
     ? WORLD_CHAIN_TOKENS.filter((t) => allowedAddresses.has(t.address.toLowerCase()))
     : WORLD_CHAIN_TOKENS;
@@ -140,6 +146,8 @@ function TokenBlock({
 
   function TokenRow({ t }: { t: typeof WORLD_CHAIN_TOKENS[number] }) {
     const isSelected = !isNative && t.address.toLowerCase() === token.address.toLowerCase();
+    const bal = pickerBalanceMap?.[t.address.toLowerCase()];
+    const hasBal = bal !== undefined && bal > 0;
     return (
       <button
         key={t.address}
@@ -156,6 +164,11 @@ function TokenBlock({
             {t.name}
           </p>
         </div>
+        {hasBal && !isSelected && (
+          <span className="text-[12px] tabular-nums" style={{ color: "rgba(255,255,255,0.35)", flexShrink: 0 }}>
+            {bal!.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+          </span>
+        )}
         {isSelected && <Check size={13} style={{ color: "rgba(255,255,255,0.55)", flexShrink: 0 }} />}
       </button>
     );
@@ -207,23 +220,6 @@ function TokenBlock({
 
               {/* Scrollable token list */}
               <div className="overflow-y-auto flex-1">
-                {/* Native ETH */}
-                {showNative && (
-                  <button
-                    onClick={() => { onTokenChange(nativeToken()); onOpenChange(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 active:bg-white/5 transition-colors"
-                  >
-                    <ChainIcon chainId="world-chain" size={32} />
-                    <div className="flex-1 text-left min-w-0">
-                      <p className="text-[14px] font-semibold text-white">{WORLD_CHAIN.symbol}</p>
-                      <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.3)" }}>
-                        World Chain · Native
-                      </p>
-                    </div>
-                    {isNative && <Check size={13} style={{ color: "rgba(255,255,255,0.55)", flexShrink: 0 }} />}
-                  </button>
-                )}
-
                 {/* Held tokens section */}
                 {held.length > 0 && (
                   <>
@@ -496,14 +492,12 @@ function NoRouteSuggestions({
         No route available
       </p>
       <div className="space-y-[7px]">
-        {!isNativeFrom && (
-          <div className="flex items-start gap-2">
-            <span className="mt-[3px] text-[9px] flex-shrink-0" style={{ color: "rgba(255,255,255,0.2)" }}>›</span>
-            <p className="text-[12px] leading-snug" style={{ color: "rgba(255,255,255,0.35)" }}>
-              Try using native {WORLD_CHAIN.symbol} or USDC.e as your starting token — deeper liquidity.
-            </p>
-          </div>
-        )}
+        <div className="flex items-start gap-2">
+          <span className="mt-[3px] text-[9px] flex-shrink-0" style={{ color: "rgba(255,255,255,0.2)" }}>›</span>
+          <p className="text-[12px] leading-snug" style={{ color: "rgba(255,255,255,0.35)" }}>
+            Try using WETH or USDC.e as your starting token — deeper liquidity.
+          </p>
+        </div>
         <div className="flex items-start gap-2">
           <span className="mt-[3px] text-[9px] flex-shrink-0" style={{ color: "rgba(255,255,255,0.2)" }}>›</span>
           <p className="text-[12px] leading-snug" style={{ color: "rgba(255,255,255,0.35)" }}>
@@ -521,6 +515,81 @@ function NoRouteSuggestions({
 // Shows the user's current + post-buy position. The single highest-signal
 // thing that separates "swap" from "invest" is knowing what you'll hold after.
 
+// ── ConvictionStrip ───────────────────────────────────────────────────────────
+// Compact "why this token / why now" block shown BEFORE amount entry in invest mode.
+// Answers: how big is this asset? what is it? do I already hold it?
+
+function ConvictionStrip({
+  marketCapUSD,
+  descriptionTitle,
+  userBalance,
+  symbol,
+}: {
+  marketCapUSD: number | null | undefined;
+  descriptionTitle: string | null | undefined;
+  userBalance: number;
+  symbol: string;
+}) {
+  const hasPosition = userBalance > 0.0000001;
+
+  function fmtMktCap(n: number): string {
+    if (n >= 1e12) return `$${(n / 1e12).toFixed(1)}T`;
+    if (n >= 1e9)  return `$${(n / 1e9).toFixed(1)}B`;
+    if (n >= 1e6)  return `$${(n / 1e6).toFixed(0)}M`;
+    return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  }
+
+  function fmtBal(n: number): string {
+    if (n < 0.001)  return n.toFixed(6);
+    if (n < 1)      return n.toFixed(4);
+    if (n < 10_000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  }
+
+  const mktCapStr = marketCapUSD && marketCapUSD > 1_000_000
+    ? `${fmtMktCap(marketCapUSD)} mkt cap`
+    : null;
+
+  // Build the context sentence: "$2.1B mkt cap · Proof-of-humanity meets digital money"
+  const parts: string[] = [];
+  if (mktCapStr) parts.push(mktCapStr);
+  if (descriptionTitle) parts.push(descriptionTitle);
+  const contextLine = parts.join(" · ");
+
+  // Nothing to show — render nothing (silence > noise)
+  if (!contextLine && !hasPosition) return null;
+
+  return (
+    <div className="flex flex-col items-center gap-[6px] mt-2">
+      {contextLine && (
+        <p
+          className="text-center leading-snug"
+          style={{
+            fontSize: 11.5,
+            color: "rgba(255,255,255,0.25)",
+            letterSpacing: "0.005em",
+            maxWidth: 300,
+          }}
+        >
+          {contextLine}
+        </p>
+      )}
+      {hasPosition && (
+        <p
+          style={{
+            fontSize: 11,
+            color: "rgba(255,255,255,0.2)",
+            letterSpacing: "0.015em",
+          }}
+        >
+          You hold {fmtBal(userBalance)} {symbol}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── PositionStrip ─────────────────────────────────────────────────────────────
 function PositionStrip({
   symbol,
   currentBalance,
@@ -559,6 +628,7 @@ function PositionStrip({
     return `$${(n / 1e6).toFixed(2)}M`;
   }
   function fmtPct(n: number): string {
+    if (n > 100) return ">100%";
     return n < 0.1 ? `${n.toFixed(2)}%` : `${n.toFixed(1)}%`;
   }
 
@@ -617,6 +687,264 @@ function PositionStrip({
   );
 }
 
+// ── CompareSheet ──────────────────────────────────────────────────────────────
+
+interface CompareToken {
+  cgId: string | null;
+  symbol: string;
+  name: string;
+  logoURI?: string;
+  address: string;
+}
+
+interface TokenMarketData {
+  price: number | null;
+  marketCap: number | null;
+  volume24h: number | null;
+  circulatingSupply: number | null;
+  totalSupply: number | null;
+  ath: number | null;
+  athDate: string | null;
+}
+
+function CompareSheet({
+  defaultA,
+  onClose,
+}: {
+  defaultA: CompareToken;
+  onClose: () => void;
+}) {
+  const [tokenA, setTokenA] = useState<CompareToken>(defaultA);
+  const [tokenB, setTokenB] = useState<CompareToken>(() => {
+    const wld = SEARCH_TOKENS.find((t) => t.symbol === "WLD");
+    const eth = SEARCH_TOKENS.find((t) => t.symbol === "WETH");
+    if (defaultA.symbol !== "WLD" && wld) {
+      return { cgId: wld.coingeckoId, symbol: wld.symbol, name: wld.name, logoURI: wld.logoURI, address: wld.contractAddress };
+    }
+    if (eth) {
+      return { cgId: eth.coingeckoId, symbol: eth.symbol, name: eth.name, logoURI: eth.logoURI, address: eth.contractAddress };
+    }
+    return { cgId: "ethereum", symbol: "ETH", name: "Ethereum", address: NATIVE_ETH };
+  });
+
+  const [pickerFor, setPickerFor] = useState<"a" | "b" | null>(null);
+
+  const { data: marketA } = useQuery<TokenMarketData | null>({
+    queryKey: ["token-market", tokenA.cgId],
+    queryFn: async () => {
+      if (!tokenA.cgId) return null;
+      const res = await fetch(`/api/token-market?id=${tokenA.cgId}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!tokenA.cgId,
+    staleTime: 120_000,
+  });
+
+  const { data: marketB } = useQuery<TokenMarketData | null>({
+    queryKey: ["token-market", tokenB.cgId],
+    queryFn: async () => {
+      if (!tokenB.cgId) return null;
+      const res = await fetch(`/api/token-market?id=${tokenB.cgId}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!tokenB.cgId,
+    staleTime: 120_000,
+  });
+
+  const cgPair = [tokenA.cgId, tokenB.cgId].filter(Boolean).join(",");
+  const { data: priceData } = useQuery<Record<string, { usd: number; usd_24h_change: number }> | null>({
+    queryKey: ["compare-prices", cgPair],
+    queryFn: async () => {
+      if (!cgPair) return null;
+      const res = await fetch(`/api/prices?ids=${cgPair}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!cgPair,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+
+  const descA = tokenA.cgId ? TOKEN_DESCRIPTIONS[tokenA.cgId] ?? null : null;
+  const descB = tokenB.cgId ? TOKEN_DESCRIPTIONS[tokenB.cgId] ?? null : null;
+  const change24A = tokenA.cgId ? priceData?.[tokenA.cgId]?.usd_24h_change ?? null : null;
+  const change24B = tokenB.cgId ? priceData?.[tokenB.cgId]?.usd_24h_change ?? null : null;
+
+  function fmtPrice(n: number | null | undefined): string {
+    if (n == null) return "—";
+    if (n >= 10_000) return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    if (n >= 1) return `$${n.toFixed(2)}`;
+    if (n >= 0.001) return `$${n.toFixed(4)}`;
+    return `$${n.toFixed(6)}`;
+  }
+  function fmtMktCap(n: number | null | undefined): string {
+    if (n == null) return "—";
+    if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
+    if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+    if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+    return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  }
+  function fmtSupply(n: number | null | undefined): string {
+    if (n == null) return "—";
+    if (n >= 1e12) return `${(n / 1e12).toFixed(2)}T`;
+    if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+    return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  }
+  function fmtChange(n: number | null): React.ReactNode {
+    if (n == null) return <span style={{ color: "rgba(255,255,255,0.25)" }}>—</span>;
+    const color = n >= 0 ? "#4ade80" : "#f87171";
+    return <span style={{ color }}>{n >= 0 ? "+" : ""}{n.toFixed(2)}%</span>;
+  }
+
+  function Row({ label, valA, valB }: { label: string; valA: React.ReactNode; valB: React.ReactNode }) {
+    const cellStyle: React.CSSProperties = {
+      fontSize: 13,
+      fontWeight: 500,
+      textAlign: "right",
+      letterSpacing: "-0.012em",
+      color: "rgba(255,255,255,0.72)",
+    };
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", alignItems: "center", paddingTop: 11, paddingBottom: 11, borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.28)" }}>{label}</span>
+        <div style={cellStyle}>{valA}</div>
+        <div style={cellStyle}>{valB}</div>
+      </div>
+    );
+  }
+
+  const content = (
+    <>
+      <div className="fixed inset-0 z-[9998]" style={{ background: "rgba(0,0,0,0.72)" }} onClick={onClose} />
+      <div
+        className="fixed bottom-0 left-0 right-0 z-[9999] rounded-t-2xl flex flex-col"
+        style={{ maxWidth: 430, margin: "0 auto", background: "#111111", border: "1px solid rgba(255,255,255,0.07)", borderBottom: "none", maxHeight: "86vh" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 shrink-0" style={{ paddingTop: 16, paddingBottom: 14, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <p style={{ fontSize: 16, fontWeight: 700, color: "white" }}>Compare</p>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center active:bg-white/10" style={{ background: "rgba(255,255,255,0.06)" }}>
+            <X size={15} style={{ color: "rgba(255,255,255,0.6)" }} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-4">
+          {/* Token selectors */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, paddingTop: 14, paddingBottom: 14 }}>
+            {(
+              [
+                { tok: tokenA, slot: "a" as const, set: setTokenA },
+                { tok: tokenB, slot: "b" as const, set: setTokenB },
+              ] as const
+            ).map(({ tok, slot }) => (
+              <button
+                key={slot}
+                onClick={() => setPickerFor(pickerFor === slot ? null : slot)}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl active:opacity-70 transition-opacity text-left"
+                style={{ background: "#181818", border: `1px solid ${pickerFor === slot ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.07)"}` }}
+              >
+                <TokenIcon logoURI={tok.logoURI} symbol={tok.symbol} size={24} />
+                <div className="flex-1 min-w-0">
+                  <p style={{ fontSize: 14, fontWeight: 700, color: "white", letterSpacing: "-0.01em" }} className="truncate">{tok.symbol}</p>
+                  <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }} className="truncate">{tok.name}</p>
+                </div>
+                <ChevronDown
+                  size={10}
+                  strokeWidth={2.25}
+                  style={{ color: "rgba(255,255,255,0.25)", flexShrink: 0, transform: pickerFor === slot ? "rotate(180deg)" : undefined, transition: "transform 0.15s" }}
+                />
+              </button>
+            ))}
+          </div>
+
+          {/* Inline token picker */}
+          {pickerFor && (
+            <div className="rounded-xl overflow-hidden mb-4" style={{ background: "#181818", border: "1px solid rgba(255,255,255,0.08)", maxHeight: 220, overflowY: "auto" }}>
+              {SEARCH_TOKENS.map((t) => {
+                const otherAddr = pickerFor === "a" ? tokenB.address.toLowerCase() : tokenA.address.toLowerCase();
+                const isSame = t.contractAddress.toLowerCase() === otherAddr;
+                const ct: CompareToken = { cgId: t.coingeckoId, symbol: t.symbol, name: t.name, logoURI: t.logoURI, address: t.contractAddress };
+                return (
+                  <button
+                    key={t.contractAddress}
+                    disabled={isSame}
+                    onClick={() => {
+                      if (pickerFor === "a") setTokenA(ct); else setTokenB(ct);
+                      setPickerFor(null);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 active:bg-white/5 transition-colors disabled:opacity-25"
+                  >
+                    <TokenIcon logoURI={t.logoURI} symbol={t.symbol} size={26} />
+                    <div className="text-left min-w-0">
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "white" }}>{t.symbol}</p>
+                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }} className="truncate">{t.name}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Comparison table */}
+          {!pickerFor && (
+            <div style={{ paddingBottom: 36 }}>
+              {/* Column headers */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", alignItems: "center", paddingBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 2 }}>
+                <span />
+                <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: "right", letterSpacing: "-0.01em" }}>{tokenA.symbol}</p>
+                <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: "right", letterSpacing: "-0.01em" }}>{tokenB.symbol}</p>
+              </div>
+
+              <Row label="Price" valA={fmtPrice(marketA?.price)} valB={fmtPrice(marketB?.price)} />
+              <Row label="24h change" valA={fmtChange(change24A)} valB={fmtChange(change24B)} />
+              <Row label="Market cap" valA={fmtMktCap(marketA?.marketCap)} valB={fmtMktCap(marketB?.marketCap)} />
+              <Row label="24h volume" valA={fmtMktCap(marketA?.volume24h)} valB={fmtMktCap(marketB?.volume24h)} />
+              <Row label="All-time high" valA={fmtPrice(marketA?.ath)} valB={fmtPrice(marketB?.ath)} />
+              <Row label="Circ. supply" valA={fmtSupply(marketA?.circulatingSupply)} valB={fmtSupply(marketB?.circulatingSupply)} />
+              <Row label="Total supply" valA={fmtSupply(marketA?.totalSupply)} valB={fmtSupply(marketB?.totalSupply)} />
+
+              {/* Purpose + tags */}
+              {(descA || descB) && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 18 }}>
+                  {(
+                    [
+                      { desc: descA, tok: tokenA },
+                      { desc: descB, tok: tokenB },
+                    ] as const
+                  ).map(({ desc, tok }) => (
+                    <div key={tok.address} className="rounded-xl px-3 py-3" style={{ background: "#181818", border: "1px solid rgba(255,255,255,0.06)" }}>
+                      <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginBottom: 7 }}>{tok.symbol}</p>
+                      {desc ? (
+                        <>
+                          <p style={{ fontSize: 11, lineHeight: 1.55, color: "rgba(255,255,255,0.42)", marginBottom: 8 }}>{desc.title}</p>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            {desc.tags.map((tag) => (
+                              <span key={tag} style={{ fontSize: 9, fontWeight: 500, color: "rgba(255,255,255,0.28)", background: "rgba(255,255,255,0.06)", borderRadius: 5, padding: "2px 6px" }}>
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.18)" }}>No data available</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+
+  return typeof document !== "undefined" ? createPortal(content, document.body) : null;
+}
+
 export default function BridgeView({
   address,
   heldAddresses,
@@ -630,7 +958,7 @@ export default function BridgeView({
   /** Total portfolio value in USD — used for position weight calculation */
   totalPortfolioUSD?: number;
 }) {
-  const [fromToken, setFromToken] = useState<TokenState>(nativeToken());
+  const [fromToken, setFromToken] = useState<TokenState>(wethToken);
   const [toToken, setToToken] = useState<TokenState>(usdcToken);
   const [amount, setAmount] = useState("");
   const [step, setStep] = useState<FlowStep>("form");
@@ -641,6 +969,7 @@ export default function BridgeView({
   const [pendingFreshQuote, setPendingFreshQuote] = useState<UniswapQuoteResult | null>(null);
   // Which picker is open — only one at a time
   const [openPicker, setOpenPicker] = useState<"from" | "to" | null>(null);
+  const [showCompare, setShowCompare] = useState(false);
   const executionInFlight = useRef(false);
 
   // Success summary — captured at transaction time so the success screen is stable
@@ -743,6 +1072,18 @@ export default function BridgeView({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromToken.address]);
+
+  // Guard: native ETH (0x000…) must never appear as from or to — replace with WETH
+  useEffect(() => {
+    if (fromToken.address.toLowerCase() === NATIVE_ETH.toLowerCase()) {
+      setFromToken(wethToken());
+    }
+  }, [fromToken.address]);
+  useEffect(() => {
+    if (toToken.address.toLowerCase() === NATIVE_ETH.toLowerCase()) {
+      setToToken(wethToken());
+    }
+  }, [toToken.address]);
 
   // ── Balance helpers ───────────────────────────────────────────────────────
 
@@ -1780,6 +2121,7 @@ export default function BridgeView({
               onMax={handleMax}
               isOpen={openPicker === "from"}
               onOpenChange={(open) => setOpenPicker(open ? "from" : null)}
+              pickerBalanceMap={balanceMap}
             />
             <TokenBlock
               label="You get"
@@ -1792,6 +2134,7 @@ export default function BridgeView({
               allowedAddresses={allowedToAddresses}
               isOpen={openPicker === "to"}
               onOpenChange={(open) => setOpenPicker(open ? "to" : null)}
+              pickerBalanceMap={balanceMap}
             />
           </div>
 
@@ -1832,6 +2175,24 @@ export default function BridgeView({
                 </div>
               );
             })()}
+
+            {/* Conviction context — market cap · description · position */}
+            <ConvictionStrip
+              marketCapUSD={toTokenLivePrice?.usd_market_cap}
+              descriptionTitle={toTokenDescription?.title}
+              userBalance={balanceMap?.[toToken.address.toLowerCase()] ?? 0}
+              symbol={toSymbol}
+            />
+
+            {/* Compare button */}
+            <button
+              onClick={() => setShowCompare(true)}
+              className="flex items-center gap-1 mt-3 active:opacity-50 transition-opacity"
+              style={{ fontSize: 11, color: "rgba(255,255,255,0.28)", letterSpacing: "0.01em" }}
+            >
+              <span>Compare</span>
+              <span style={{ fontSize: 10, marginTop: 1 }}>↔</span>
+            </button>
           </div>
 
           {/* Divider */}
@@ -1902,8 +2263,8 @@ export default function BridgeView({
                 className="flex items-center gap-1.5 mt-3 pt-2.5"
                 style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
               >
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.22)" }}>You receive</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.55)", letterSpacing: "-0.01em" }}>
+                <TokenIcon logoURI={toToken.logoURI} symbol={toSymbol} size={14} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.6)", letterSpacing: "-0.01em" }}>
                   ~{toAmount} {toSymbol}
                 </span>
               </div>
@@ -1978,6 +2339,14 @@ export default function BridgeView({
               Sell {toSymbol} instead →
             </button>
           )}
+
+          {/* Compare sheet */}
+          {showCompare && (
+            <CompareSheet
+              defaultA={{ cgId: toTokenCgId, symbol: toSymbol, name: toToken.name ?? toSymbol, logoURI: toToken.logoURI, address: toToken.address }}
+              onClose={() => setShowCompare(false)}
+            />
+          )}
         </div>
       ) : (
         /* ════════════════════════════════════════════════════════════════
@@ -1996,6 +2365,7 @@ export default function BridgeView({
             onMax={handleMax}
             isOpen={openPicker === "from"}
             onOpenChange={(open) => setOpenPicker(open ? "from" : null)}
+            pickerBalanceMap={balanceMap}
           />
 
           {/* Flip */}
@@ -2023,6 +2393,7 @@ export default function BridgeView({
             allowedAddresses={allowedToAddresses}
             isOpen={openPicker === "to"}
             onOpenChange={(open) => setOpenPicker(open ? "to" : null)}
+            pickerBalanceMap={balanceMap}
           />
 
           {/* Route + CTA */}

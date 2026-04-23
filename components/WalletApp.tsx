@@ -11,8 +11,6 @@ import WelcomeScreen, { EmptyWalletCard } from "./WelcomeScreen";
 import OnboardingScreen from "./OnboardingScreen";
 import WalletHeader from "./WalletHeader";
 import BalanceCard from "./BalanceCard";
-import MoversCard from "./MoversCard";
-import WatchlistCard from "./WatchlistCard";
 import SearchModal from "./SearchModal";
 import QuickActions from "./QuickActions";
 import ChainList from "./ChainList";
@@ -81,6 +79,27 @@ export default function WalletApp() {
   const isBalanceLoading = balancesLoading || !prices;
   const isEmpty = !isBalanceLoading && totalUSD === 0;
 
+  // Portfolio-wide weighted 24h change — includes WLD + World Chain tokens
+  const portfolioChange24h = useMemo(() => {
+    if (totalUSD <= 0) return 0;
+    let weighted = 0;
+    // Native chain balances (ETH on various chains)
+    for (const b of balances ?? []) {
+      if (b.usdValue > 0) weighted += b.priceChange24h * (b.usdValue / totalUSD);
+    }
+    // WLD
+    const wldUSD = wldBalance?.usd ?? 0;
+    if (wldUSD > 0) {
+      const wldChange = prices?.["worldcoin-wld"]?.usd_24h_change ?? 0;
+      weighted += wldChange * (wldUSD / totalUSD);
+    }
+    // World Chain ERC-20s (USDC.e, WETH, etc.)
+    for (const t of tokenBalances ?? []) {
+      if (t.balanceUSD > 0) weighted += t.priceChange24h * (t.balanceUSD / totalUSD);
+    }
+    return weighted;
+  }, [totalUSD, balances, wldBalance, tokenBalances, prices]);
+
   // 1D portfolio chart for home screen sparkline
   const homeChartHoldings = useMemo(() => {
     const result: { coingeckoId: string; amount: number }[] = [];
@@ -103,8 +122,8 @@ export default function WalletApp() {
 
   const { data: homeChartData } = usePortfolioChart(homeChartHoldings, 1);
 
-  // Return-value features: "since you left" + movers
-  const { sinceYouLeft, movers, dismissBanner, bannerDismissed } = useReturnValue({
+  // Return-value: "since you left" summary
+  const { sinceYouLeft } = useReturnValue({
     totalUSD,
     balances,
     wldBalance,
@@ -187,6 +206,7 @@ export default function WalletApp() {
                     username={wallet.username}
                     sparklineData={homeChartData ?? null}
                     sinceYouLeft={sinceYouLeft}
+                    portfolioChange24h={portfolioChange24h}
                   />
                 )}
 
@@ -196,21 +216,13 @@ export default function WalletApp() {
                   onSwap={() => setNavTab("swap")}
                 />
 
-                {/* Markets — quick invest entry point */}
+                {/* Markets — Trending / Movers / Watchlist with sparklines */}
                 <MarketsRail
                   prices={prices}
                   balanceMap={balanceMap}
                   onTokenTap={setSelectedToken}
-                  onSeeAll={() => setNavTab("swap")}
+                  onSeeAll={() => setSearchOpen(true)}
                 />
-
-                {/* Movers since last visit */}
-                {movers.length > 0 && !isEmpty && (
-                  <MoversCard movers={movers} />
-                )}
-
-                {/* Watchlist */}
-                <WatchlistCard onTokenTap={setSelectedToken} />
 
                 <ChainList
                   balances={balances}

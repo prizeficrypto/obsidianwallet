@@ -13,6 +13,8 @@ interface BalanceCardProps {
   username: string | null;
   sparklineData?: [number, number][] | null;
   sinceYouLeft?: SinceYouLeftData | null;
+  /** Portfolio-wide weighted 24h change (%), computed externally to include all assets */
+  portfolioChange24h?: number;
 }
 
 // ── Mini sparkline ─────────────────────────────────────────────────────────────
@@ -70,20 +72,22 @@ export default function BalanceCard({
   isLoading,
   sparklineData,
   sinceYouLeft,
+  portfolioChange24h,
 }: BalanceCardProps) {
   const hideBalances = useSettingsStore((s) => s.hideBalances);
   const { format, symbol } = useCurrency();
 
   const freshBalances = balances?.filter((b) => !b.isStale) ?? [];
   const freshTotal = freshBalances.reduce((s, b) => s + b.usdValue, 0);
-  const change24h =
-    freshTotal > 0
+  const change24h = portfolioChange24h !== undefined
+    ? portfolioChange24h
+    : freshTotal > 0
       ? freshBalances.reduce(
           (sum, b) => sum + b.priceChange24h * (b.usdValue / freshTotal),
           0,
         )
       : 0;
-  const changeUSD = freshTotal * (change24h / 100);
+  const changeUSD = (portfolioChange24h !== undefined ? totalUSD : freshTotal) * (change24h / 100);
   const isPositive = change24h >= 0;
   const changeColor = isPositive ? "#4ade80" : "#f87171";
   const neutralChange = Math.abs(change24h) < 0.005;
