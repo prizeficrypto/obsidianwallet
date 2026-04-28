@@ -1357,15 +1357,23 @@ export default function BridgeView({
           chainId: WORLD_CHAIN_ID,
           transactions,
         });
-        // MiniKit wraps the result: { commandPayload, finalPayload: { status, transaction_id } }
-        // Fall back to checking top-level fields for forward-compat with older SDK versions.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const r = res as any;
-        const payload = r?.finalPayload ?? r;
+        console.log("[swap] MiniKit raw response:", JSON.stringify(r, null, 2));
+        // MiniKit v2 SDK wraps result in { executedWith, data } — and executeWithFallback
+        // only returns (never throws) on success, so executedWith being present IS success.
+        // v1 / older builds may return fields in finalPayload or at the top level.
+        const payload = r?.finalPayload ?? r?.data ?? r;
         const isSuccess =
-          payload?.status === "success" || !!payload?.transaction_id || !!payload?.userOpHash;
+          r?.executedWith === "minikit" ||
+          r?.executedWith === "wagmi" ||
+          r?.executedWith === "fallback" ||
+          payload?.status === "success" ||
+          !!payload?.transaction_id ||
+          !!payload?.userOpHash;
         const hash =
-          payload?.transaction_id ?? payload?.userOpHash ?? r?.transaction_id ?? r?.userOpHash ?? "";
+          payload?.transaction_id ?? payload?.userOpHash ??
+          r?.transaction_id ?? r?.userOpHash ?? "";
         if (isSuccess) {
           setSuccessSummary({
             fromAmount: amount,
@@ -1382,11 +1390,13 @@ export default function BridgeView({
         }
       } catch (e) {
         const code = (e as { code?: string })?.code ?? "";
+        // Log full MiniKit error details to help diagnose which contract is blocked
+        if (code) console.error("[swap] MiniKit error", { code, details: (e as { details?: unknown })?.details, fromToken: fromToken.address });
         const msg =
           code === "user_rejected"
             ? "Cancelled."
             : code === "invalid_contract"
-            ? "Swap not permitted yet. The Uniswap router must be whitelisted in the World Developer Portal under this app's permitted contracts."
+            ? `Contract not permitted in World Developer Portal. Add both the token contract (${fromToken.address}) and the Uniswap router (${UNISWAP_SWAP_ROUTER}) to Permitted Contracts.`
             : code
             ? `Transaction failed: ${code}`
             : (e instanceof Error ? e.message : "Transaction failed");
@@ -1463,10 +1473,16 @@ export default function BridgeView({
       const res = await MiniKit.sendTransaction({ chainId: WORLD_CHAIN_ID, transactions });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const r = res as any;
-      const payload = r?.finalPayload ?? r;
+      console.log("[swap/0x] MiniKit raw response:", JSON.stringify(r, null, 2));
+      const payload = r?.finalPayload ?? r?.data ?? r;
       const isSuccess =
-        payload?.status === "success" || !!payload?.transaction_id || !!payload?.userOpHash;
-      const hash = payload?.transaction_id ?? payload?.userOpHash ?? "";
+        r?.executedWith === "minikit" ||
+        r?.executedWith === "wagmi" ||
+        r?.executedWith === "fallback" ||
+        payload?.status === "success" ||
+        !!payload?.transaction_id ||
+        !!payload?.userOpHash;
+      const hash = payload?.transaction_id ?? payload?.userOpHash ?? r?.transaction_id ?? r?.userOpHash ?? "";
 
       if (isSuccess) {
         setSuccessSummary({
@@ -1484,9 +1500,12 @@ export default function BridgeView({
       }
     } catch (e) {
       const code = (e as { code?: string })?.code ?? "";
+      if (code) console.error("[swap/0x] MiniKit error", { code, details: (e as { details?: unknown })?.details, fromToken: fromToken.address });
       const msg =
         code === "user_rejected"
           ? "Cancelled."
+          : code === "invalid_contract"
+          ? `Contract not permitted in World Developer Portal. Add both the token contract (${fromToken.address}) and the Uniswap router (${UNISWAP_SWAP_ROUTER}) to Permitted Contracts.`
           : code
           ? `Transaction failed: ${code}`
           : (e instanceof Error ? e.message : "Transaction failed");
