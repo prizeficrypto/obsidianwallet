@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, Search, TrendingUp, PieChart } from "lucide-react";
+import { Home, Search, PiggyBank, PieChart } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 
 interface BottomNavProps {
@@ -12,10 +12,10 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   const { t } = useTranslation();
 
   const NAV_ITEMS = [
-    { id: "home",      icon: Home,       label: t("nav.home")      },
-    { id: "search",    icon: Search,     label: t("nav.search")    },
-    { id: "swap",      icon: TrendingUp, label: t("nav.invest")    },
-    { id: "portfolio", icon: PieChart,   label: t("nav.portfolio") },
+    { id: "home",      icon: Home,      label: t("nav.home")      },
+    { id: "search",    icon: Search,    label: t("nav.search")    },
+    { id: "earn",      icon: PiggyBank, label: t("nav.earn")      },
+    { id: "portfolio", icon: PieChart,  label: t("nav.portfolio") },
   ];
 
   return (

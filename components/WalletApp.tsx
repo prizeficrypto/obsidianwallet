@@ -21,13 +21,14 @@ import ReceiveModal from "./modals/ReceiveModal";
 import SettingsScreen from "./screens/SettingsScreen";
 import ActivityScreen from "./screens/ActivityScreen";
 import PortfolioScreen from "./screens/PortfolioScreen";
+import EarnScreen from "./screens/EarnScreen";
 import TokenDetailScreen from "./screens/TokenDetailScreen";
 import { useReturnValue } from "@/hooks/useReturnValue";
 import { useWorldChainTokenBalances } from "@/hooks/useWorldChainTokenBalances";
 import MarketsRail from "./MarketsRail";
 import type { SelectedToken } from "@/types/token";
 
-type NavTab = "home" | "swap" | "activity" | "portfolio" | "settings" | "search";
+type NavTab = "home" | "swap" | "earn" | "activity" | "portfolio" | "settings" | "search";
 type Flow = "send" | "receive" | null;
 
 export default function WalletApp() {
@@ -102,25 +103,44 @@ export default function WalletApp() {
 
   // 1D portfolio chart for home screen sparkline
   const homeChartHoldings = useMemo(() => {
-    const result: { coingeckoId: string; amount: number }[] = [];
+    const result: import("@/hooks/usePortfolioChart").PortfolioHolding[] = [];
     if (wldBalance) {
       const amt = parseFloat(wldBalance.formatted);
-      if (amt > 0) result.push({ coingeckoId: "worldcoin-wld", amount: amt });
+      if (amt > 0) {
+        result.push({
+          coingeckoId: "worldcoin-wld",
+          symbol: "WLD",
+          amount: amt,
+          contractAddress: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+          kind: "erc20",
+        });
+      }
     }
     for (const b of balances ?? []) {
       if (b.nativeBalance > 0 && b.chain.coingeckoId) {
-        result.push({ coingeckoId: b.chain.coingeckoId, amount: b.nativeBalance });
+        result.push({
+          coingeckoId: b.chain.coingeckoId,
+          symbol: b.chain.symbol,
+          amount: b.nativeBalance,
+          kind: "native",
+        });
       }
     }
     for (const t of tokenBalances ?? []) {
       if (t.balance > 0 && t.coingeckoId) {
-        result.push({ coingeckoId: t.coingeckoId, amount: t.balance });
+        result.push({
+          coingeckoId: t.coingeckoId,
+          symbol: t.symbol,
+          amount: t.balance,
+          contractAddress: t.contractAddress,
+          kind: "erc20",
+        });
       }
     }
     return result;
   }, [wldBalance, balances, tokenBalances]);
 
-  const { data: homeChartData } = usePortfolioChart(homeChartHoldings, 1);
+  const { data: homeChartData } = usePortfolioChart(homeChartHoldings, 1, wallet.address);
 
   // Return-value: "since you left" summary
   const { sinceYouLeft } = useReturnValue({
@@ -251,6 +271,7 @@ export default function WalletApp() {
                 totalUSD={totalUSD}
                 isLoading={isBalanceLoading}
                 tokenBalances={tokenBalances ?? undefined}
+                address={wallet.address}
               />
             )}
 
@@ -260,6 +281,14 @@ export default function WalletApp() {
                 heldAddresses={heldAddresses}
                 balanceMap={balanceMap}
                 totalPortfolioUSD={totalUSD}
+              />
+            )}
+
+            {navTab === "earn" && (
+              <EarnScreen
+                address={wallet.address}
+                wldBalance={wldBalance}
+                wldPriceUSD={wldPriceUSD}
               />
             )}
           </main>

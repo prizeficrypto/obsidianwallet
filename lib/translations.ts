@@ -2,7 +2,7 @@ export const translations = {
   en: {
     "nav.home": "Home",
     "nav.search": "Search",
-    "nav.invest": "Invest",
+    "nav.earn": "Earn",
     "nav.portfolio": "Portfolio",
 
     "welcome.tagline": "Your World Chain portfolio",
@@ -70,7 +70,7 @@ export const translations = {
   fr: {
     "nav.home": "Accueil",
     "nav.search": "Recherche",
-    "nav.invest": "Investir",
+    "nav.earn": "Gagner",
     "nav.portfolio": "Portefeuille",
 
     "welcome.tagline": "Votre portefeuille World Chain",
@@ -138,7 +138,7 @@ export const translations = {
   es: {
     "nav.home": "Inicio",
     "nav.search": "Buscar",
-    "nav.invest": "Invertir",
+    "nav.earn": "Ganar",
     "nav.portfolio": "Portafolio",
 
     "welcome.tagline": "Tu portafolio de World Chain",
@@ -206,7 +206,7 @@ export const translations = {
   pt: {
     "nav.home": "Início",
     "nav.search": "Pesquisar",
-    "nav.invest": "Investir",
+    "nav.earn": "Ganhar",
     "nav.portfolio": "Portfólio",
 
     "welcome.tagline": "Seu portfólio World Chain",
@@ -274,7 +274,7 @@ export const translations = {
   id: {
     "nav.home": "Beranda",
     "nav.search": "Cari",
-    "nav.invest": "Investasi",
+    "nav.earn": "Hasilkan",
     "nav.portfolio": "Portofolio",
 
     "welcome.tagline": "Portofolio World Chain Anda",
@@ -342,7 +342,7 @@ export const translations = {
   de: {
     "nav.home": "Startseite",
     "nav.search": "Suchen",
-    "nav.invest": "Investieren",
+    "nav.earn": "Verdienen",
     "nav.portfolio": "Portfolio",
 
     "welcome.tagline": "Dein World Chain Portfolio",
@@ -410,7 +410,7 @@ export const translations = {
   vi: {
     "nav.home": "Trang chủ",
     "nav.search": "Tìm kiếm",
-    "nav.invest": "Đầu tư",
+    "nav.earn": "Kiếm",
     "nav.portfolio": "Danh mục",
 
     "welcome.tagline": "Danh mục World Chain của bạn",
@@ -478,7 +478,7 @@ export const translations = {
   it: {
     "nav.home": "Home",
     "nav.search": "Cerca",
-    "nav.invest": "Investire",
+    "nav.earn": "Guadagna",
     "nav.portfolio": "Portafoglio",
 
     "welcome.tagline": "Il tuo portafoglio World Chain",

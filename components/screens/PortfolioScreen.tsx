@@ -38,6 +38,8 @@ interface PortfolioScreenProps {
   totalUSD: number;
   isLoading: boolean;
   tokenBalances?: ERC20Balance[];
+  /** Wallet address — required to reconstruct historical balances. */
+  address: string | null;
 }
 
 // ── Time ranges ─────────────────────────────────────────────────────
@@ -60,6 +62,7 @@ export default function PortfolioScreen({
   totalUSD,
   isLoading,
   tokenBalances,
+  address,
 }: PortfolioScreenProps) {
   const [chartDays, setChartDays] = useState<Days>(1);
   const [scrubPoint, setScrubPoint] = useState<ScrubPoint | null>(null);
@@ -168,27 +171,47 @@ export default function PortfolioScreen({
       .slice(0, 3);
   }, [balances, wldBalance, wldPriceChange, tokenBalances]);
 
-  // Build holdings for chart
+  // Build holdings for chart — include contract addresses + kind so the
+  // hook can reconstruct historical balances from Transfer events.
   const holdings: PortfolioHolding[] = useMemo(() => {
     const result: PortfolioHolding[] = [];
     if (wldBalance) {
       const amt = parseFloat(wldBalance.formatted);
-      if (amt > 0) result.push({ coingeckoId: "worldcoin-wld", amount: amt });
+      if (amt > 0) {
+        result.push({
+          coingeckoId: "worldcoin-wld",
+          symbol: "WLD",
+          amount: amt,
+          contractAddress: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+          kind: "erc20",
+        });
+      }
     }
     for (const b of balances ?? []) {
       if (b.nativeBalance > 0 && b.chain.coingeckoId) {
-        result.push({ coingeckoId: b.chain.coingeckoId, amount: b.nativeBalance });
+        result.push({
+          coingeckoId: b.chain.coingeckoId,
+          symbol: b.chain.symbol,
+          amount: b.nativeBalance,
+          kind: "native",
+        });
       }
     }
     for (const t of tokenBalances ?? []) {
       if (t.balance > 0 && t.coingeckoId) {
-        result.push({ coingeckoId: t.coingeckoId, amount: t.balance });
+        result.push({
+          coingeckoId: t.coingeckoId,
+          symbol: t.symbol,
+          amount: t.balance,
+          contractAddress: t.contractAddress,
+          kind: "erc20",
+        });
       }
     }
     return result;
   }, [balances, wldBalance, tokenBalances]);
 
-  const { data: chartData, isLoading: chartLoading } = usePortfolioChart(holdings, chartDays);
+  const { data: chartData, isLoading: chartLoading } = usePortfolioChart(holdings, chartDays, address);
 
   // Chart change calculation
   const chartChange = useMemo(() => {
@@ -355,7 +378,7 @@ export default function PortfolioScreen({
         className="mx-4 mt-1.5 mb-0"
         style={{ fontSize: 10, color: "rgba(255,255,255,0.22)", lineHeight: 1.4, letterSpacing: "0.01em" }}
       >
-        * Assumes current holdings held for the full period shown — does not reflect past trades or deposits.
+        * Reconstructed from on-chain transfer history. Historical balances may be incomplete if older transfers were not indexed.
       </p>
 
       {/* Allocation section */}
