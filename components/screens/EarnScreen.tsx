@@ -421,8 +421,9 @@ export default function EarnScreen({
             lineHeight: 1.5,
           }}
         >
-          Lend WLD on the Morpho WLD/WETH market. Interest auto-compounds — no claiming required.
-          Your balance grows continuously while supplied. Withdraw anytime back to your wallet.
+          Lend WLD through the Re7 WLD vault on Morpho. Interest auto-compounds — no claiming
+          required. Your balance grows continuously while supplied. Withdraw anytime back to your
+          wallet.
         </p>
       </div>
     </div>
